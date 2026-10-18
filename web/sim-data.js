@@ -255,28 +255,61 @@ function speakResponse(body, signal) {
   return shimResp({ ct: 'application/octet-stream', stream });
 }
 
-/* -------------------------------------------------------- offline bundle */
-const MANIFEST = [
-  'README.md', 'MEMO.md', 'build_bundle.py', 'go/gateway/go.mod', 'go/gateway/llm.go',
-  'go/gateway/main.go', 'go/gateway/scheduler.go', 'go/gateway/segmenter.go',
-  'go/gateway/segmenter_test.go', 'go/gateway/session.go', 'go/gateway/chat.go',
-  'go/gateway/gateway_test.go', 'py/analyst.py', 'py/audio_rt.py', 'py/bootstrap.py',
-  'py/chat.py', 'py/deps.py', 'py/persist.py', 'py/qtts_common.py', 'py/supervisor.py',
-  'py/worker.py', 'rust/audio_rt/Cargo.toml', 'rust/audio_rt/src/lib.rs',
-  'tools/chat_check.py', 'tools/e2e_check.py', 'tools/selftest.py', 'tools/watermark_check.py',
-  'tools/web_smoke.mjs', 'tools/build_sim.py', 'web/index.html', 'web/styles.css',
-  'web/app.js', 'web/player.js', 'web/chat.js', 'web/simulator.js', 'web/sim.html', 'web/sim-data.js',
-];
-const OFFLINE_BUNDLE = `#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# QTTS one-cell Kaggle deployment bundle (browser-simulator preview).
-# The simulator fetched this copy for offline preview; the live gateway or
-# GitHub serves the exact 211 KB payload with the same 34+ file manifest.
-import base64
-FILES = {
-${MANIFEST.map((p) => `    "${p}": ("sim", "offline-preview"),`).join('\n')}
+/* ---------------------------------------------------- the real deploy bundle */
+/* The copy button must yield the REAL runnable `yuyinkelong` — the single-cell
+   Kaggle script.  Sources are tried in order; every candidate is validated by
+   its self-extracting markers before it is accepted.  If none works the route
+   answers 502 and the UI says so — it never shows fake "code" to copy. */
+function looksRunnable(t) {
+  return typeof t === 'string' && t.startsWith('#!/') &&
+    t.includes('QTTS BUNDLE START') && t.includes('QTTS BUNDLE END') &&
+    t.includes('FILES = {') && t.includes('import base64');
 }
-`;
+
+const utf8Decode = (bytes) => {
+  let s = '';
+  for (let i = 0; i < bytes.length;) {
+    const b = bytes[i++];
+    if (b < 0x80) s += String.fromCharCode(b);
+    else if (b < 0xe0) s += String.fromCharCode(((b & 31) << 6) | (bytes[i++] & 63));
+    else if (b < 0xf0) s += String.fromCharCode(((b & 15) << 12) | ((bytes[i++] & 63) << 6) | (bytes[i++] & 63));
+    else {
+      const cp = ((b & 7) << 18) | ((bytes[i++] & 63) << 12) | ((bytes[i++] & 63) << 6) | (bytes[i++] & 63);
+      const u = cp - 0x10000;
+      s += String.fromCharCode(0xd800 + (u >> 10), 0xdc00 + (u & 1023));
+    }
+  }
+  return s;
+};
+const b64Decode = (b64) => {
+  const bin = atob(String(b64).replace(/[\n\r]/g, ''));
+  const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return utf8Decode(u);
+};
+
+async function fetchRunnableBundle(realFetch) {
+  const sources = [
+    { url: '/deploy/bundle' },                       // live gateway (preview & Kaggle)
+    { url: '../yuyinkelong' },                       // repo checkout served statically
+    { url: 'sim-bundle.txt' },                       // byte copy next to the console
+    { url: 'https://raw.githubusercontent.com/bizuming1-ui/Kaggle/arena/4367c483-kaggle/yuyinkelong' },
+    { url: 'https://github.com/bizuming1-ui/Kaggle/raw/arena/4367c483-kaggle/yuyinkelong' },
+    {
+      url: 'https://api.github.com/repos/bizuming1-ui/Kaggle/contents/yuyinkelong?ref=arena/4367c483-kaggle',
+      api: true,
+    },
+  ];
+  for (const s of sources) {
+    try {
+      const r = await realFetch(s.url, { cache: 'no-store' });
+      if (!r || !r.ok) continue;
+      const t = s.api ? b64Decode(((await r.json()) || {}).content || '') : await r.text();
+      if (looksRunnable(t)) return t;
+    } catch (_) { /* try the next source */ }
+  }
+  return null;
+}
 
 /* ------------------------------------------------------------- the router */
 const jobs = new Map();
@@ -354,20 +387,10 @@ function route(url, opts, realFetch) {
   }
 
   if (path === '/deploy/bundle') {
-    // try the real GitHub raw copy first (the browser has internet); fall
-    // back to the offline manifest preview when it cannot be reached.
-    try {
-      return Promise.resolve(realFetch('https://raw.githubusercontent.com/bizuming1-ui/Kaggle/arena/4367c483-kaggle/yuyinkelong'))
-        .then((r) => {
-          if (r && r.ok) {
-            return Promise.resolve(r.text()).then((t) => (t && t.includes('import base64') ? textResp(t) : textResp(OFFLINE_BUNDLE)));
-          }
-          return textResp(OFFLINE_BUNDLE);
-        })
-        .catch(() => textResp(OFFLINE_BUNDLE));
-    } catch (_) {
-      return textResp(OFFLINE_BUNDLE);
-    }
+    // Always the REAL yuyinkelong so “复制 → Kaggle 运行” works for real.
+    return fetchRunnableBundle(realFetch).then((t) => (t
+      ? textResp(t)
+      : shimResp({ status: 502, text: 'error: 部署包暂不可用（本机、网关、GitHub 均未取到真实 yuyinkelong）' })));
   }
 
   // unknown route: pass through to the real network when there is one
@@ -393,6 +416,5 @@ export function installMockFetch() {
 export const simInfo = {
   profiles: PROFILES,
   policy: POLICY,
-  manifest: MANIFEST,
   get active() { return ACTIVE.id; },
 };

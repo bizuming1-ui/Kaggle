@@ -101,7 +101,9 @@ Kaggle `GPU T4 x2` 上：
   - `tools/chat_check.py`：8/8（ASR、chat 轮次、缺密钥优雅报错、播放器零欠载、**barge-in**、interrupt-all）；
   - `tools/failinject.py`：6/6（**杀 worker0 中途不死、改派、自动重启**；打断有始有终；错误路径 400）；
   - `tools/watermark_check.py`：PASS（无饥饿、水位有界、启停不抖动）。
-- 单文件 `yuyinkelong`：SHA256 自校验、与源码树逐字节一致。
+- 单文件 `yuyinkelong`：SHA256 自校验、与源码树逐字节一致；**合法 Python**（构建时 `compile()` 语法校验）；
+  E2E 试运行（把复制文本当单元格 exec，仅桩掉 bootstrap 子进程）：37 文件自解压 + 自校验 + 启动 ✓。
+  ⚠️ 修复过一个致命旧伤：HEADER 文档字符串 `"""` 未闭合会让整份部署包 `SyntaxError`——语法校验已固化进 `build_bundle.py --check`。
 
 ## 7. **尚未**在真实 T4×2 上验证（第一次运行必须看的点）
 - faster-qwen3-tts 0.5.4 在 Kaggle 当前 torch/transformers 组合下的安装与 CUDA Graph 捕获

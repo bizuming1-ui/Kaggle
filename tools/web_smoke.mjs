@@ -84,9 +84,10 @@ const dom = new JSDOM(html, {
           }],
         });
       }
-      if (u.startsWith('/deploy/bundle')) {
-        return new Response('import base64\nFILES = {\n  "MEMO.md": ("abc", (\n    "xyz"\n  )),\n}\n', {
-          headers: { 'content-type': 'text/plain' },
+      if (u.startsWith('/deploy/bundle') || u.endsWith('sim-bundle.txt') || u.endsWith('/yuyinkelong')) {
+        // the stub gateway serves the REAL deploy bundle, exactly like production
+        return new Response(readFileSync(path.resolve(HERE, '..', 'yuyinkelong'), 'utf8'), {
+          headers: { 'content-type': 'text/plain; charset=utf-8' },
         });
       }
       if (u.startsWith('/api/speak')) {
@@ -179,7 +180,8 @@ doc.querySelector('[data-tab="sim"]').dispatchEvent(new w.Event('click', { bubbl
 await new Promise((r) => setTimeout(r, 120));
 must(doc.querySelector('#panel-sim')?.hasAttribute('data-active'), 'sim panel must activate');
 await new Promise((r) => setTimeout(r, 500));
-must(doc.querySelector('#simCode')?.textContent?.includes('import base64'), 'the bundle must be loaded');
+must(doc.querySelector('#simCode')?.textContent?.includes('QTTS BUNDLE START'), 'the real bundle must be loaded');
+must(doc.querySelector('#simLen')?.textContent?.includes('✓ 可直接运行'), 'the bundle must be flagged runnable');
 must(doc.querySelector('#simLen')?.textContent?.includes('文件'), 'the bundle stats must be rendered');
 
 // the copy button must actually copy the bundle
@@ -187,7 +189,8 @@ let copied = null;
 w.navigator.clipboard.writeText = async (t) => { copied = t; };
 doc.querySelector('#btnCopy').dispatchEvent(new w.Event('click', { bubbles: true }));
 await new Promise((r) => setTimeout(r, 200));
-must(copied && copied.includes('import base64'), 'the copy button must copy the bundle');
+must(copied && copied.includes('QTTS BUNDLE START') && copied.includes('FILES = {'),
+  'the copy button must copy the REAL runnable yuyinkelong bundle');
 
 // the lab speak button must synthesise and report the first-audio time
 doc.querySelector('[data-tab="lab"]').dispatchEvent(new w.Event('click', { bubbles: true }));

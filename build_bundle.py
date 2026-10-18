@@ -24,6 +24,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "yuyinkelong"
+# Byte copy of the bundle served next to the web console (web/ is the only dir
+# the gateway FileServer exposes).  The browser simulator's copy button fetches
+# this file so "copy → paste into Kaggle" works with the REAL runnable bundle,
+# even when github.com is unreachable.  Deliberately NOT listed in FILES below:
+# the bundle must never contain a copy of itself.
+SIM_COPY = ROOT / "web" / "sim-bundle.txt"
 
 # (path in bundle, source path, mode) - order matters only for readability.
 FILES: list[tuple[str, str, str]] = [
@@ -82,6 +88,7 @@ HOW TO USE (Kaggle notebook, Accelerator: GPU T4 x2, Internet: On)
 
   >>> Do not edit anything between the markers. <<<
 
+"""
 # ----------------------------- QTTS BUNDLE START -----------------------------
 '''
 
@@ -174,6 +181,7 @@ def build() -> str:
     parts.append(FOOTER)
     text = "".join(parts)
     OUT.write_text(text, encoding="utf-8")
+    SIM_COPY.write_bytes(OUT.read_bytes())   # same bytes → the simulator can copy the real bundle
     return text
 
 
@@ -183,6 +191,11 @@ def check() -> int:
         print("✗ yuyinkelong missing")
         return 1
     src = OUT.read_text(encoding="utf-8")
+    try:
+        compile(src, str(OUT), "exec")   # the pasted cell must be valid Python
+    except SyntaxError as e:
+        print(f"✗ yuyinkelong is not valid Python: {e}")
+        return 1
     m = re.search(r"^FILES = \{", src, re.M)
     if not m:
         print("✗ no FILES table in the bundle")
@@ -220,7 +233,12 @@ def check() -> int:
     if bad:
         print(f"\n{bad} mismatch(es) → run: python build_bundle.py")
         return 1
+    if not SIM_COPY.exists() or SIM_COPY.read_bytes() != OUT.read_bytes():
+        print("✗ web/sim-bundle.txt missing or differs from yuyinkelong — run: python build_bundle.py")
+        bad += 1
+        return 1
     print(f"✓ bundle is in sync with the source tree ({len(files)} files)")
+    print("✓ web/sim-bundle.txt == yuyinkelong (simulator copies the real bundle)")
     return 0
 
 

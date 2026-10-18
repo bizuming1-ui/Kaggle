@@ -34,8 +34,10 @@ export function initSimulator(state) {
         codeEl.textContent = bundle;
         const kb = (bundle.length / 1024).toFixed(0);
         const files = (bundle.match(/^    "[^"]+":/gm) || []).length;
+        const runnable = bundle.startsWith('#!/') && bundle.includes('QTTS BUNDLE START') &&
+          bundle.includes('QTTS BUNDLE END') && bundle.includes('FILES = {');
         const l = $('#simLen');
-        if (l) l.textContent = `${files} 文件 · ${kb} KB`;
+        if (l) l.textContent = `${files} 文件 · ${kb} KB · ${runnable ? '✓ 可直接运行' : '⚠ 非部署包'}`;
       }
       step(1, true);
       return bundle;
@@ -69,7 +71,7 @@ export function initSimulator(state) {
     copyBtn.innerHTML = '✓ 已复制';
     step(3, true);
     setTimeout(() => { copyBtn.dataset.done = '0'; copyBtn.innerHTML = '复制'; }, 2200);
-    toast(`已复制 ${(bundle.length / 1024).toFixed(0)} KB 部署包，粘贴到 Kaggle 的一个单元格里即可`, 'good');
+    toast(`已复制 ${Math.round(bundle.length / 1024)} KB 真实部署包（yuyinkelong）——粘贴进 Kaggle 的一个单元格即可直接运行`, 'good');
   });
 
   /* ---------------------------------------------------------- live self check */
