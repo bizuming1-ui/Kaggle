@@ -50,6 +50,8 @@ Kaggle `GPU T4 x2` 上：
 - 浏览器→网关：`POST /api/telemetry` 每 250 ms：`played_s, buffered_s, state, urgency, underruns`。
 - REST：`/api/health /api/config /api/speak /api/chat/asr /api/chat/interrupt /api/chat/state`
   `/api/profiles /api/profiles/activate /api/llm/models /deploy/bundle` + `/api/prep/*`（反代 analyst）。
+- 浏览器模拟器：`web/sim.html` 与 `index.html` **逐字节相同**（`tools/build_sim.py` 生成/校验），
+  `web/sim-data.js` 在浏览器内应答以上全部路由（帧协议同款），页面内容与 Kaggle 运行站点一致。
 
 ## 4. 关键设计决策（及原因）
 1. **首音 < 3 s 的三件套**：① 策略新增 `start_fast_s=0.30`（首播只等 0.3 s，不再等 1.3–6 s 的深缓冲）；
@@ -92,7 +94,8 @@ Kaggle `GPU T4 x2` 上：
 - Rust：tree-sitter 零语法错误；FFI 符号契约与 `audio_rt.py` 逐一核对；bootstrap 载入时做 ABI 自检。
 - Python：全模块编译通过；`deps.probe()`/constraints 实测。
 - 前端：`tools/web_smoke.mjs`（jsdom 真实 DOM + stub 网关）全过：3 个 Tab、状态栏、hero 指标、
-  声纹列表、部署包加载、复制按钮、管线状态、电平表、朗读首包计时、自检控制台。
+  声纹列表、部署包加载、复制按钮、管线状态、电平表、朗读首包计时、自检控制台；
+  `--sim` 模式对**模拟器页面**（sim-data.js 后端）跑同一组 11 项断言同样全过——两页同源同内容。
 - 全链路 mock 实测：
   - `tools/selftest.py`：7/7（rust/go/workers/每卡流式/e2e/**首音 169 ms < 3 s**/**RTF 0.21 < 0.5**）；
   - `tools/chat_check.py`：8/8（ASR、chat 轮次、缺密钥优雅报错、播放器零欠载、**barge-in**、interrupt-all）；

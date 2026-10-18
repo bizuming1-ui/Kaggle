@@ -12,6 +12,10 @@
 
 也可以用浏览器里的 **Launchpad** 页签直接一键复制部署包。
 
+## 浏览器模拟器（不上 Kaggle 先看效果）
+
+[`web/sim.html`](./web/sim.html) 是**浏览器模拟器**：与 Kaggle 运行的网站**同一套页面源码**（由 `tools/build_sim.py` 从 `index.html` 逐字节生成），只是把网络层换成 `web/sim-data.js` 的浏览器内置模拟后端——双 T4 状态、克隆音色、延迟指标、流式合成帧全部就地应答。打开即见与 Kaggle 部署**完全一致**的页面内容，可交互试听、打断、跑自检。`tools/web_smoke.mjs --sim` 对两个页面跑同一组 11 项断言保证一致。
+
 ## 三个页签
 
 | 页签 | 功能 |
@@ -50,8 +54,8 @@ build_bundle.py      ← 由源码树生成/校验 yuyinkelong
 py/                  ← bootstrap / deps(CUDA 安全安装) / worker / analyst / chat / supervisor / persist
 go/gateway/          ← Go 网关（31 个单测）
 rust/audio_rt/       ← Rust 实时音频运行时（5 个单测）
-web/                 ← 控制台（index.html + styles.css + app/player/chat/simulator.js）
-tools/               ← selftest / e2e_check / chat_check / failinject / watermark_check / web_smoke
+web/                 ← 控制台（index.html + sim.html 模拟器 + styles.css + app/player/chat/simulator/sim-data.js）
+tools/               ← selftest / e2e_check / chat_check / failinject / watermark_check / web_smoke / build_sim
 MEMO.md              ← 设计决策、实测数据、诚实声明、排错速查
 ```
 

@@ -540,6 +540,19 @@ body::after {
 .hr { height: 1px; background: var(--line); border: 0; margin-block: 30px; }
 .hidden-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
+/* ------------------------------------------------------ simulator chip */
+.simchip { position: fixed; right: 18px; bottom: 18px; z-index: 60; display: inline-flex;
+           align-items: center; gap: 10px; padding: 9px 12px; border-radius: 999px;
+           background: rgba(217, 255, 63, .10); border: 1px solid rgba(217, 255, 63, .38);
+           color: var(--acid); font-family: var(--ff-mono); font-size: 11px;
+           letter-spacing: .10em; backdrop-filter: blur(10px); }
+.simchip button { background: none; border: 0; color: inherit; font-size: 15px;
+                  line-height: 1; cursor: pointer; opacity: .7; padding: 0 2px; }
+.simchip button:hover { opacity: 1; }
+
+.simopen { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+           flex-wrap: wrap; }
+
 @media (max-width: 720px) {
   .nav { order: 3; width: 100%; margin: 0 0 10px; overflow-x: auto; }
   .topbar__inner { height: auto; flex-wrap: wrap; padding-block: 12px; }

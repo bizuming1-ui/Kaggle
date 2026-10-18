@@ -55,12 +55,15 @@ FILES: list[tuple[str, str, str]] = [
     ("tools/selftest.py", "tools/selftest.py", "r"),
     ("tools/watermark_check.py", "tools/watermark_check.py", "r"),
     ("tools/web_smoke.mjs", "tools/web_smoke.mjs", "r"),
+    ("tools/build_sim.py", "tools/build_sim.py", "r"),
     ("web/index.html", "web/index.html", "r"),
+    ("web/sim.html", "web/sim.html", "r"),
     ("web/styles.css", "web/styles.css", "r"),
     ("web/app.js", "web/app.js", "r"),
     ("web/player.js", "web/player.js", "r"),
     ("web/chat.js", "web/chat.js", "r"),
     ("web/simulator.js", "web/simulator.js", "r"),
+    ("web/sim-data.js", "web/sim-data.js", "r"),
 ]
 
 HEADER = '''#!/usr/bin/env python3

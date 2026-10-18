@@ -31,7 +31,8 @@ vc.on('error', (...a) => errors.push('console.error: ' + a.join(' ')));
 vc.on('warn', () => {});
 vc.on('log', () => {});
 
-const html = readFileSync(path.join(WEB, 'index.html'), 'utf8');
+const SIMPAGE = process.argv.includes('--sim');
+const html = readFileSync(path.join(WEB, SIMPAGE ? 'sim.html' : 'index.html'), 'utf8');
 
 class LocalOnly extends ResourceLoader {
   fetch(url) {
@@ -45,7 +46,7 @@ class LocalOnly extends ResourceLoader {
 }
 
 const dom = new JSDOM(html, {
-  url: 'http://127.0.0.1:7860/',
+  url: SIMPAGE ? 'http://127.0.0.1:7860/sim.html' : 'http://127.0.0.1:7860/',
   runScripts: 'dangerously',
   resources: new LocalOnly(),
   pretendToBeVisual: true,
@@ -156,12 +157,15 @@ const problems = [];
 const must = (cond, msg) => { if (!cond) problems.push(msg); };
 
 const doc = w.document;
+const WANT_RTF = SIMPAGE ? '2.41' : '1.82';
 must(doc.querySelectorAll('.nav button').length === 3, 'nav must have 3 tabs');
 must(doc.querySelector('#panel-lab')?.hasAttribute('data-active'), 'lab panel must be active by default');
 must(doc.querySelector('#statusText')?.textContent?.includes('GPU'), 'status must show the GPU count');
-must(doc.querySelector('#mRtf')?.textContent?.includes('1.82'), 'hero RTF must come from /api/health');
+must(doc.querySelector('#mRtf')?.textContent?.includes(WANT_RTF), `hero RTF must be ${WANT_RTF}`);
 must(doc.querySelector('#stModel')?.textContent === 'deepseek-flash', 'LLM model must be rendered');
-must(doc.querySelector('#profList')?.children.length >= 1, 'the profile list must render');
+must(doc.querySelector('#profList')?.children.length >= (SIMPAGE ? 2 : 1), 'the profile list must render');
+must(SIMPAGE ? !!doc.querySelector('.simchip') : !doc.querySelector('.simchip'),
+  SIMPAGE ? 'the simulator chip must be present in sim mode' : 'no simulator chip on the real site');
 
 // tab switching
 doc.querySelector('[data-tab="chat"]').dispatchEvent(new w.Event('click', { bubbles: true }));
@@ -204,12 +208,12 @@ must(log.includes('probe'), 'the self-check must run a synthesis probe');
 /* ---------------- report ---------------- */
 const all = [...problems, ...errors];
 if (all.length) {
-  console.log('✗ DOM smoke test FAILED');
+  console.log(`✗ DOM smoke test FAILED (${SIMPAGE ? 'simulator page' : 'site page'})`);
   for (const p of all) console.log('   - ' + p);
   process.exit(1);
 }
-console.log('✓ DOM smoke test passed: ' + [
+console.log(`✓ DOM smoke test passed (${SIMPAGE ? 'simulator page · sim-data.js backend' : 'site page · stub gateway'}): ` + [
   '3 tabs', 'status', 'hero metrics', 'profile list', 'bundle load', 'copy',
-  'pipeline', 'level meter', 'speak latency', 'self-check',
+  'pipeline', 'level meter', 'speak latency', 'self-check', 'sim chip',
 ].join(', '));
 process.exit(0);

@@ -4,6 +4,11 @@
 import { QTTSPlayer, FrameReader, FRAME, SR } from './player.js';
 import { initChat } from './chat.js';
 import { initSimulator } from './simulator.js';
+import { installMockFetch } from './sim-data.js';
+
+/* Simulator mode: sim.html (byte-identical to the Kaggle-served page) or
+   index.html?sim=1 renders the same UI against browser-side mock data. */
+const SIM = location.pathname.endsWith('sim.html') || new URLSearchParams(location.search).has('sim');
 
 /* ------------------------------------------------------------------ utils */
 export const $ = (s, r = document) => r.querySelector(s);
@@ -430,6 +435,7 @@ export function pcmToWav(chunks, sr = SR) {
 
 /* ------------------------------------------------------------------ boot */
 async function boot() {
+  if (SIM) installMockFetch();
   heroCanvas();
 
   state.player = new QTTSPlayer({
@@ -456,6 +462,18 @@ async function boot() {
 
   const hash = location.hash.replace('#', '');
   if (['lab', 'chat', 'sim'].includes(hash)) showTab(hash);
+
+  if (SIM) {
+    const chip = document.createElement('div');
+    chip.className = 'simchip';
+    chip.innerHTML = '<span>● 浏览器模拟器 · 与 Kaggle 运行站点同源</span>';
+    const x = document.createElement('button');
+    x.textContent = '×';
+    x.setAttribute('aria-label', '关闭角标');
+    x.addEventListener('click', () => chip.remove());
+    chip.appendChild(x);
+    document.body.appendChild(chip);
+  }
 }
 
 export const chatState = { underruns: 0 };
