@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Go build output (bootstrap compiles it on Kaggle)
+go/gateway/gateway
+tools_bin/
+*.test
+
+# Rust
+rust/audio_rt/target/
+**/*.so
+
+# Node (dev tooling for tools/web_smoke.mjs)
+node_modules/
+package-lock.json
+
+# Runtime state
+qtts/
+state/
+*.log
+.DS_Store
