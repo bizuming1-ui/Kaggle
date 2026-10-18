@@ -67,7 +67,9 @@ export function initSimulator(state) {
   async function loadBundle(force = false) {
     if (loaded && !force) return bundle;
     try {
-      const res = await fetch('/deploy/bundle', { cache: 'no-store' });
+      const sig = (typeof AbortSignal !== 'undefined' && AbortSignal.timeout)
+        ? AbortSignal.timeout(8000) : undefined;
+      const res = await fetch('/deploy/bundle', { cache: 'no-store', signal: sig });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const txt = await res.text();
       if (!looksRunnable(txt)) throw new Error('内容不是可运行部署包');
@@ -98,46 +100,85 @@ export function initSimulator(state) {
   }
 
   /* ---------------------------------------------------------- copy */
-  async function writeClip(text) {
+  /* Clipboard in embedded/previews can reject navigator.clipboard; a plain
+     execCommand inside the user gesture is the reliable path there.  Only a
+     real success shows "✓ 已复制" — otherwise we select the code and tell the
+     user to press Ctrl+C. */
+  function selectText(el) {
     try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch (_) {
+      if (!el) return;
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection();
+      if (sel) { sel.removeAllRanges(); sel.addRange(range); }
+      el.scrollIntoView({ block: 'nearest' });
+    } catch (_) { /* selection is a best-effort fallback */ }
+  }
+
+  async function copySmart(text, preEl) {
+    // 1) synchronous path inside the click gesture (works in most iframes)
+    try {
       const ta = document.createElement('textarea');
       ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
       document.body.appendChild(ta);
       ta.select();
+      ta.setSelectionRange(0, text.length);
       const ok = document.execCommand('copy');
       ta.remove();
-      return ok;
-    }
+      if (ok) return 'copied';
+    } catch (_) { /* fall through */ }
+    // 2) modern API (needs permission + focus)
+    try {
+      await navigator.clipboard.writeText(text);
+      return 'copied';
+    } catch (_) { /* fall through */ }
+    // 3) last resort: select the visible code so Ctrl+C works
+    selectText(preEl);
+    return 'selected';
   }
 
   const copyBtn = $('#btnCopy');
   copyBtn?.addEventListener('click', async () => {
-    copyBtn.innerHTML = '拉取最新…';
-    let text = await loadBundle(true);           // never copy a stale in-memory bundle
-    if (!looksRunnable(text)) text = await loadBundle(true);   // one honest retry
+    let text = bundle;
+    if (!looksRunnable(text)) {
+      copyBtn.innerHTML = '拉取最新…';
+      text = await loadBundle(true);
+      if (!looksRunnable(text)) text = await loadBundle(true);   // one honest retry
+    }
     if (!looksRunnable(text)) {
       copyBtn.innerHTML = '复制';
-      return toast('部署包暂不可用——请改用「复制小引导格」（从镜像下载，永远可用）', 'bad');
+      selectText(codeEl);
+      return toast('部署包暂不可用——请改用「复制小引导格」（零网络即可复制）', 'bad');
     }
-    await writeClip(text);
-    copyBtn.dataset.done = '1';
-    copyBtn.innerHTML = '✓ 已复制';
-    step(3, true);
     const fp = await fingerprint(text);
-    setTimeout(() => { copyBtn.dataset.done = '0'; copyBtn.innerHTML = '复制'; }, 2200);
-    toast(`已复制 ${Math.round(text.length / 1024)} KB 真实部署包（yuyinkelong · 指纹 ${fp}）——粘贴进 Kaggle 一个单元格即可直接运行`, 'good');
+    const how = await copySmart(text, codeEl);
+    if (how === 'copied') {
+      copyBtn.dataset.done = '1';
+      copyBtn.innerHTML = '✓ 已复制';
+      step(3, true);
+      setTimeout(() => { copyBtn.dataset.done = '0'; copyBtn.innerHTML = '复制'; }, 2200);
+      toast(`已复制 ${Math.round(text.length / 1024)} KB 真实部署包（yuyinkelong · 指纹 ${fp}）——粘贴进 Kaggle 一个单元格即可直接运行`, 'good');
+    } else {
+      copyBtn.innerHTML = '复制';
+      toast('浏览器限制了剪贴板——已为你选中代码，请按 Ctrl+C（Mac: ⌘C）复制', 'bad');
+    }
+    loadBundle(true).catch(() => {});   // keep the cached copy fresh for next time
   });
 
   const miniBtn = $('#btnCopyMini');
   miniBtn?.addEventListener('click', async () => {
-    await writeClip(MINI);
-    miniBtn.dataset.done = '1';
-    miniBtn.innerHTML = '✓ 已复制';
-    setTimeout(() => { miniBtn.dataset.done = '0'; miniBtn.innerHTML = '复制小引导格'; }, 2200);
-    toast('已复制小引导格（约 1 KB）——粘贴进 Kaggle 一个单元格运行，它会自动下载完整部署包并启动', 'good');
+    const how = await copySmart(MINI, miniEl);
+    if (how === 'copied') {
+      miniBtn.dataset.done = '1';
+      miniBtn.innerHTML = '✓ 已复制';
+      setTimeout(() => { miniBtn.dataset.done = '0'; miniBtn.innerHTML = '复制小引导格'; }, 2200);
+      toast('已复制小引导格（约 1 KB）——粘贴进 Kaggle 一个单元格运行，它会自动下载完整部署包并启动', 'good');
+    } else {
+      toast('浏览器限制了剪贴板——已为你选中代码，请按 Ctrl+C（Mac: ⌘C）复制', 'bad');
+    }
   });
 
   /* ---------------------------------------------------------- live self check */

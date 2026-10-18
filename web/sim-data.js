@@ -302,7 +302,9 @@ async function fetchRunnableBundle(realFetch) {
   ];
   for (const s of sources) {
     try {
-      const r = await realFetch(s.url, { cache: 'no-store' });
+      const sig = (typeof AbortSignal !== 'undefined' && AbortSignal.timeout)
+        ? AbortSignal.timeout(8000) : undefined;
+      const r = await realFetch(s.url, { cache: 'no-store', signal: sig });
       if (!r || !r.ok) continue;
       const t = s.api ? b64Decode(((await r.json()) || {}).content || '') : await r.text();
       if (looksRunnable(t)) return t;

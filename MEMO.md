@@ -117,6 +117,9 @@ Kaggle `GPU T4 x2` 上：
 - cloudflared 隧道对长连接 POST 流的缓冲（网关已设 `X-Accel-Buffering: no` 并逐帧 Flush）。
 
 ## 8. 排错速查
+- **预览页显示「连接中…」/代码框空白/按钮无反应**：预览背后的服务已随沙箱回收（页面只剩浏览器缓存）。
+  恢复：`bash tools/dev_env.sh`（重建 /tmp 运行时 + setsid 守护进程拉起整栈）。页面顶部的红色浮层会提示资源加载失败。
+- **点「复制」没反应/提示浏览器限制**：页面会自动选中代码并提示按 Ctrl+C（Mac ⌘C）；或用「小引导格」按钮（零网络即可复制）。
 - 日志：`/kaggle/working/qtts/state/logs/*.out`；状态：`curl localhost:7860/api/health`；
   配置真相：`curl localhost:7860/api/config`。
 - **装完 CUDA 不可用**：看 bootstrap 的"✗ torch.cuda.is_available() is False"输出，按提示装匹配 wheel：

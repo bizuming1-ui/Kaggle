@@ -329,6 +329,18 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 }
 
+func TestResponsesAreNeverCached(t *testing.T) {
+	a := newTestApp(t)
+	h := a.routes()
+	for _, path := range []string{"/api/health", "/api/config", "/deploy/bundle", "/app.js", "/"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+			t.Fatalf("%s: Cache-Control = %q, want no-store", path, got)
+		}
+	}
+}
+
 func TestInterruptEndpoint(t *testing.T) {
 	a := newTestApp(t)
 	rec := httptest.NewRecorder()
@@ -355,7 +367,7 @@ func TestRoutesAreRegistered(t *testing.T) {
 	a := newTestApp(t)
 	h := a.routes()
 	for _, p := range []string{"/api/health", "/api/config", "/api/speak", "/api/chat/interrupt",
-		"/api/chat/asr", "/api/chat/state", "/deploy/bundle", "/api/prep/"} {
+		"/api/chat/asr", "/api/chat/state", "/deploy/bundle", "/api/prep/profiles"} {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, p, nil)
 		h.ServeHTTP(rec, req)

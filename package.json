@@ -8,6 +8,6 @@
     "test": "node --experimental-vm-modules tools/web_smoke.mjs"
   },
   "devDependencies": {
-    "jsdom": "^26.0.0"
+    "jsdom": "^24.0.0"
   }
 }

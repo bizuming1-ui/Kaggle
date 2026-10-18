@@ -123,6 +123,15 @@ const dom = new JSDOM(html, {
     window.requestAnimationFrame = (cb) => setTimeout(() => cb(Date.now()), 16);
     window.cancelAnimationFrame = (id) => clearTimeout(id);
     window.navigator.clipboard = { writeText: async () => {} };
+    // jsdom has no clipboard bridge: simulate execCommand('copy') faithfully by
+    // capturing the selected readonly textarea the copy helper creates.
+    window.document.execCommand = (cmd) => {
+      if (cmd !== 'copy') return false;
+      const ta = [...window.document.querySelectorAll('textarea')].find((t) => t.hasAttribute('readonly'));
+      if (!ta) return false;
+      window.__copiedText = ta.value;
+      return true;
+    };
     window.HTMLElement.prototype.scrollIntoView = () => {};
     window.HTMLElement.prototype.play = () => Promise.resolve();
   },
@@ -184,25 +193,43 @@ must(doc.querySelector('#simCode')?.textContent?.includes('QTTS BUNDLE START'), 
 must(doc.querySelector('#simLen')?.textContent?.includes('✓ 可直接运行'), 'the bundle must be flagged runnable');
 must(doc.querySelector('#simLen')?.textContent?.includes('文件'), 'the bundle stats must be rendered');
 
-// the copy button must actually copy the bundle
+// the copy button must actually copy the real, runnable yuyinkelong bundle
 let copied = null;
 w.navigator.clipboard.writeText = async (t) => { copied = t; };
 doc.querySelector('#btnCopy').dispatchEvent(new w.Event('click', { bubbles: true }));
-await new Promise((r) => setTimeout(r, 200));
+await new Promise((r) => setTimeout(r, 300));
+copied = copied || w.__copiedText;
 must(copied && copied.includes('QTTS BUNDLE START') && copied.includes('FILES = {'),
   'the copy button must copy the REAL runnable yuyinkelong bundle');
 
 // the mini bootstrap cell must copy too (paste-safe ~1 kB alternative)
 let copiedMini = null;
+w.__copiedText = null;
 w.navigator.clipboard.writeText = async (t) => { copiedMini = t; };
 const miniBtn = doc.querySelector('#btnCopyMini');
 must(!!miniBtn, 'the mini bootstrap cell must exist');
 miniBtn?.dispatchEvent(new w.Event('click', { bubbles: true }));
-await new Promise((r) => setTimeout(r, 120));
+await new Promise((r) => setTimeout(r, 150));
+copiedMini = copiedMini || w.__copiedText;
 must(copiedMini && copiedMini.includes('yuyinkelong') && copiedMini.includes('exec(compile('),
   'the mini cell must copy a paste-safe downloader+runner');
 must(doc.querySelector('#simMini')?.textContent?.includes('urllib.request'),
   'the mini cell source must be visible');
+
+// clipboard-denied path must NOT claim success: execCommand false + API reject
+// → the code is selected and the user is told to press Ctrl+C.
+w.document.execCommand = () => false;
+w.navigator.clipboard.writeText = async () => { throw new Error('denied'); };
+miniBtn.dataset.done = '0';
+const toastsBefore = doc.querySelectorAll('.toast').length;
+miniBtn.dispatchEvent(new w.Event('click', { bubbles: true }));
+await new Promise((r) => setTimeout(r, 150));
+const toasts = [...doc.querySelectorAll('.toast')].slice(toastsBefore);
+must(toasts.some((t) => (t.textContent || '').includes('Ctrl+C')),
+  'clipboard-denied must guide the user to press Ctrl+C');
+must(miniBtn.dataset.done !== '1',
+  'clipboard-denied must not show the done state');
+must(Array.isArray(w.__qttsErrors), 'the inline error overlay must be installed');
 
 // the lab speak button must synthesise and report the first-audio time
 doc.querySelector('[data-tab="lab"]').dispatchEvent(new w.Event('click', { bubbles: true }));

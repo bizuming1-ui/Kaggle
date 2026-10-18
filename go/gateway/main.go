@@ -386,11 +386,14 @@ func (a *App) routes() http.Handler {
 	// the one-cell bundle, so the browser "Launchpad" can copy it straight to Kaggle
 	mux.HandleFunc("/deploy/bundle", a.deployBundle)
 	fs := http.FileServer(http.Dir(a.cfg.WebDir))
-	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-cache")
-		fs.ServeHTTP(w, r)
-	}))
-	return cors(mux)
+	mux.Handle("/", fs)
+	// Nothing is ever cached: a stale module graph next to fresh HTML is the
+	// classic "page renders but every button is dead" failure mode.
+	nostore := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		mux.ServeHTTP(w, r)
+	})
+	return cors(nostore)
 }
 
 func main() {

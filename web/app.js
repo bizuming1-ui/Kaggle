@@ -435,33 +435,43 @@ export function pcmToWav(chunks, sr = SR) {
 
 /* ------------------------------------------------------------------ boot */
 async function boot() {
-  if (SIM) installMockFetch();
-  heroCanvas();
+  const step = (name, fn) => {
+    try { return fn(); } catch (e) { console.warn(`[boot] ${name} failed`, e); }
+  };
+
+  if (SIM) step('sim', installMockFetch);
+  step('hero', heroCanvas);
+
+  // Launchpad first: the copy buttons must survive any other component failing.
+  step('launchpad', () => {
+    simulator = initSimulator(state);
+    simulator.loadBundle();   // prefetch so the Launchpad is instant
+  });
+
+  step('lab', () => lab.init());
+  step('chat', () => initChat(state));
 
   state.player = new QTTSPlayer({
     onUnderrun: () => { const e = $('#stUnder'); if (e) e.textContent = String(++chatState.underruns); },
   });
   try { await state.player.init(); } catch (e) { console.warn('audio init failed', e); }
 
-  lab.init();
-  initChat(state);
-  simulator = initSimulator(state);
-  simulator.loadBundle();   // prefetch so the Launchpad is instant
+  step('status', async () => {
+    await pollStatus();
+    setInterval(pollStatus, 2500);
+    setInterval(lab.loadProfiles, 8000);
+    lab.loadProfiles();
 
-  await pollStatus();
-  setInterval(pollStatus, 2500);
-  setInterval(lab.loadProfiles, 8000);
-  lab.loadProfiles();
-
-  const cfg = await api('/api/config');
-  state.config = cfg;
-  const e = $('#stModel'); if (e) e.textContent = cfg.llm?.model || '—';
-  const k = $('#stKey'); if (k) k.textContent = cfg.llm?.key_set ? '已配置' : '未配置';
-  const v = $('#stVoice');
-  if (v) v.textContent = state.active || '未选择';
+    const cfg = await api('/api/config');
+    state.config = cfg;
+    const e = $('#stModel'); if (e) e.textContent = cfg.llm?.model || '—';
+    const k = $('#stKey'); if (k) k.textContent = cfg.llm?.key_set ? '已配置' : '未配置';
+    const v = $('#stVoice');
+    if (v) v.textContent = state.active || '未选择';
+  });
 
   const hash = location.hash.replace('#', '');
-  if (['lab', 'chat', 'sim'].includes(hash)) showTab(hash);
+  if (['lab', 'chat', 'sim'].includes(hash)) step('tab', () => showTab(hash));
 
   if (SIM) {
     const chip = document.createElement('div');
