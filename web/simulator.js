@@ -15,34 +15,79 @@ python yuyinkelong            # 自解压 → 装依赖 → 编译 → 起服务
 python tools/selftest.py --quality
 python tools/chat_check.py --url http://127.0.0.1:7860`;
 
+/* The paste-safe bootstrap cell: ~1 kB instead of ~230 kB, so a notebook
+   paste can never be silently truncated.  Pure Python — no IPython magics,
+   no string literals that a cut could leave unterminated. */
+const MINI = `# QTTS 一键部署 — 粘贴到 Kaggle 一个单元格（T4 x2 + Internet On）后运行
+import urllib.request
+URLS = [
+    "https://raw.githubusercontent.com/bizuming1-ui/Kaggle/arena/4367c483-kaggle/yuyinkelong",
+    "https://github.com/bizuming1-ui/Kaggle/raw/arena/4367c483-kaggle/yuyinkelong",
+    "https://cdn.jsdelivr.net/gh/bizuming1-ui/Kaggle@arena/4367c483-kaggle/yuyinkelong",
+]
+for _u in URLS:
+    try:
+        _d = urllib.request.urlopen(_u, timeout=120).read()
+        open("yuyinkelong", "wb").write(_d)
+        print("downloaded", len(_d), "bytes from", _u)
+        break
+    except Exception as _e:
+        print("mirror failed:", _u, "->", _e)
+else:
+    raise SystemExit("所有镜像均失败——请改用「复制完整部署包」")
+exec(compile(open("yuyinkelong", encoding="utf-8").read(), "yuyinkelong", "exec"), {"__name__": "__main__"})`;
+
+function looksRunnable(t) {
+  return typeof t === 'string' && t.startsWith('#!/') &&
+    t.includes('QTTS BUNDLE START') && t.includes('QTTS BUNDLE END') &&
+    t.includes('FILES = {') && t.includes('import base64');
+}
+
+async function fingerprint(t) {
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
+    return [...new Uint8Array(buf)].slice(0, 4).map((b) => b.toString(16).padStart(2, '0')).join('');
+  } catch (_) {
+    let h = 0;
+    for (let i = 0; i < t.length; i += 97) h = (h * 31 + t.charCodeAt(i)) >>> 0;
+    return h.toString(16).padStart(8, '0');
+  }
+}
+
 export function initSimulator(state) {
   let bundle = '';
   let loaded = false;
 
   const codeEl = $('#simCode');
   const shellEl = $('#simShell');
+  const miniEl = $('#simMini');
   if (shellEl) shellEl.textContent = SHELL;
+  if (miniEl) miniEl.textContent = MINI;
 
-  async function loadBundle() {
-    if (loaded) return bundle;
+  async function loadBundle(force = false) {
+    if (loaded && !force) return bundle;
     try {
       const res = await fetch('/deploy/bundle', { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      bundle = await res.text();
+      const txt = await res.text();
+      if (!looksRunnable(txt)) throw new Error('内容不是可运行部署包');
+      bundle = txt;
       loaded = true;
       if (codeEl) {
         codeEl.textContent = bundle;
         const kb = (bundle.length / 1024).toFixed(0);
         const files = (bundle.match(/^    "[^"]+":/gm) || []).length;
-        const runnable = bundle.startsWith('#!/') && bundle.includes('QTTS BUNDLE START') &&
-          bundle.includes('QTTS BUNDLE END') && bundle.includes('FILES = {');
+        const fp = await fingerprint(bundle);
         const l = $('#simLen');
-        if (l) l.textContent = `${files} 文件 · ${kb} KB · ${runnable ? '✓ 可直接运行' : '⚠ 非部署包'}`;
+        if (l) l.textContent = `${files} 文件 · ${kb} KB · ✓ 可直接运行 · 指纹 ${fp}`;
       }
       step(1, true);
       return bundle;
     } catch (e) {
-      if (codeEl) codeEl.textContent = `# 部署包尚未就绪（${e.message}）\n# 该服务在 Kaggle 上运行后才会存在。`;
+      loaded = false;
+      bundle = '';
+      if (codeEl) codeEl.textContent =
+        `# 部署包尚未就绪（${e.message}）\n# 请点「复制完整部署包」重试，或使用上方小引导格（从 GitHub 镜像下载）。`;
       return '';
     }
   }
@@ -53,25 +98,46 @@ export function initSimulator(state) {
   }
 
   /* ---------------------------------------------------------- copy */
-  const copyBtn = $('#btnCopy');
-  copyBtn?.addEventListener('click', async () => {
-    if (!loaded) await loadBundle();
-    if (!bundle) return toast('部署包暂不可用', 'bad');
+  async function writeClip(text) {
     try {
-      await navigator.clipboard.writeText(bundle);
+      await navigator.clipboard.writeText(text);
+      return true;
     } catch (_) {
       const ta = document.createElement('textarea');
-      ta.value = bundle;
+      ta.value = text;
       document.body.appendChild(ta);
       ta.select();
-      document.execCommand('copy');
+      const ok = document.execCommand('copy');
       ta.remove();
+      return ok;
     }
+  }
+
+  const copyBtn = $('#btnCopy');
+  copyBtn?.addEventListener('click', async () => {
+    copyBtn.innerHTML = '拉取最新…';
+    let text = await loadBundle(true);           // never copy a stale in-memory bundle
+    if (!looksRunnable(text)) text = await loadBundle(true);   // one honest retry
+    if (!looksRunnable(text)) {
+      copyBtn.innerHTML = '复制';
+      return toast('部署包暂不可用——请改用「复制小引导格」（从镜像下载，永远可用）', 'bad');
+    }
+    await writeClip(text);
     copyBtn.dataset.done = '1';
     copyBtn.innerHTML = '✓ 已复制';
     step(3, true);
+    const fp = await fingerprint(text);
     setTimeout(() => { copyBtn.dataset.done = '0'; copyBtn.innerHTML = '复制'; }, 2200);
-    toast(`已复制 ${Math.round(bundle.length / 1024)} KB 真实部署包（yuyinkelong）——粘贴进 Kaggle 的一个单元格即可直接运行`, 'good');
+    toast(`已复制 ${Math.round(text.length / 1024)} KB 真实部署包（yuyinkelong · 指纹 ${fp}）——粘贴进 Kaggle 一个单元格即可直接运行`, 'good');
+  });
+
+  const miniBtn = $('#btnCopyMini');
+  miniBtn?.addEventListener('click', async () => {
+    await writeClip(MINI);
+    miniBtn.dataset.done = '1';
+    miniBtn.innerHTML = '✓ 已复制';
+    setTimeout(() => { miniBtn.dataset.done = '0'; miniBtn.innerHTML = '复制小引导格'; }, 2200);
+    toast('已复制小引导格（约 1 KB）——粘贴进 Kaggle 一个单元格运行，它会自动下载完整部署包并启动', 'good');
   });
 
   /* ---------------------------------------------------------- live self check */

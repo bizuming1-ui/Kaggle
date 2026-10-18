@@ -93,7 +93,10 @@ def build_procs() -> list[Proc]:
     procs.append(Proc("analyst", [PY, str(ROOT / "py" / "analyst.py")], {**base_env, "CUDA_VISIBLE_DEVICES": last_gpu},
                       f"http://127.0.0.1:{ANALYST_PORT}/health"))
     gw = ROOT / "go" / "gateway" / "gateway"
-    procs.append(Proc("gateway", [str(gw)], {**base_env, "QTTS_WEB": str(ROOT / "web"), "QTTS_BIND": "127.0.0.1"},
+    # QTTS_BIND is configurable (e.g. 0.0.0.0 behind a preview proxy); the
+    # default 127.0.0.1 is what Kaggle + cloudflared expect.
+    bind = os.environ.get("QTTS_BIND", "127.0.0.1")
+    procs.append(Proc("gateway", [str(gw)], {**base_env, "QTTS_WEB": str(ROOT / "web"), "QTTS_BIND": bind},
                       f"http://127.0.0.1:{GATEWAY_PORT}/api/health"))
     return procs
 

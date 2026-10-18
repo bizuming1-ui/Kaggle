@@ -16,7 +16,7 @@
 
 [`web/sim.html`](./web/sim.html) 是**浏览器模拟器**：与 Kaggle 运行的网站**同一套页面源码**（由 `tools/build_sim.py` 从 `index.html` 逐字节生成），只是把网络层换成 `web/sim-data.js` 的浏览器内置模拟后端——双 T4 状态、克隆音色、延迟指标、流式合成帧全部就地应答。打开即见与 Kaggle 部署**完全一致**的页面内容，可交互试听、打断、跑自检。`tools/web_smoke.mjs --sim` 对两个页面跑同一组断言保证一致。
 
-模拟器里的「复制」按钮给出的是**真实可运行的 `yuyinkelong` 部署包**（带 `✓ 可直接运行` 标记，按 shebang + BUNDLE 标记 + FILES 自校验逐项验证）：优先取网关 `/deploy/bundle`，其次 `web/sim-bundle.txt` 同源副本、GitHub raw / API；全部失败时明确报错，**绝不给假代码**。粘进 Kaggle 一个单元格即跑（构建时已做 `compile()` 语法校验 + 解包 SHA 自校验的 E2E 试运行）。
+模拟器里的「复制」按钮给出的是**真实可运行的 `yuyinkelong` 部署包**（带指纹与 `✓ 可直接运行` 标记，按 shebang + BUNDLE 标记 + FILES 自校验逐项验证）：点复制时**强制重新拉取**（杜绝旧缓存混入），优先取网关 `/deploy/bundle`，其次 `web/sim-bundle.txt` 同源副本、GitHub raw / API；全部失败时明确报错，**绝不给假代码**。粘进 Kaggle 一个单元格即跑。另有**「小引导格」**（约 1 KB，多镜像下载 + 执行）——不受大段粘贴截断影响，推荐首选。构建时做 `compile()` 语法 + IPython 行首字符 + 解包 SHA 自校验的 E2E 试运行。
 
 ## 三个页签
 

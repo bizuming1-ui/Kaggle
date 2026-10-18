@@ -74,21 +74,23 @@ FILES: list[tuple[str, str, str]] = [
 
 HEADER = '''#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""QTTS - Qwen3-TTS 1.7B voice cloning on Kaggle (2x T4) - ONE-CELL DEPLOY.
-
-HOW TO USE (Kaggle notebook, Accelerator: GPU T4 x2, Internet: On)
-
-  1. Copy EVERYTHING between the markers below into one notebook cell.
-  2. Run it.  The script writes the project to /kaggle/working/qtts,
-     installs the dependencies, builds the Go gateway + Rust runtime,
-     starts 2 GPU workers and prints a public URL.
-
-  Optional Kaggle Secrets: DEEPSEEK_API_KEY (text LLM), HF_TOKEN (model hub),
-  KAGGLE_USERNAME / KAGGLE_KEY (voice-profile persistence).
-
-  >>> Do not edit anything between the markers. <<<
-
-"""
+# QTTS - Qwen3-TTS 1.7B voice cloning on Kaggle (2x T4) - ONE-CELL DEPLOY.
+#
+# HOW TO USE (Kaggle notebook, Accelerator: GPU T4 x2, Internet: On)
+#
+#   1. Copy EVERYTHING between the markers below into one notebook cell.
+#   2. Run it.  The script writes the project to /kaggle/working/qtts,
+#      installs the dependencies, builds the Go gateway + Rust runtime,
+#      starts 2 GPU workers and prints a public URL.
+#
+#   Optional Kaggle Secrets: DEEPSEEK_API_KEY (text LLM), HF_TOKEN (model hub),
+#   KAGGLE_USERNAME / KAGGLE_KEY (voice-profile persistence).
+#
+#   >>> Do not edit anything between the markers. <<<
+#
+# (Header is pure comments on purpose: no string literal that a truncated
+#  paste could leave unterminated — pasting any prefix of this file either
+#  runs or fails where the paste actually ended.)
 # ----------------------------- QTTS BUNDLE START -----------------------------
 '''
 
@@ -195,6 +197,10 @@ def check() -> int:
         compile(src, str(OUT), "exec")   # the pasted cell must be valid Python
     except SyntaxError as e:
         print(f"✗ yuyinkelong is not valid Python: {e}")
+        return 1
+    magic = [i for i, ln in enumerate(src.splitlines(), 1) if ln[:1] in ("!", "%", "?")]
+    if magic:
+        print(f"✗ IPython-hostile lines (start with ! % ?): {magic[:5]} — reformat them")
         return 1
     m = re.search(r"^FILES = \{", src, re.M)
     if not m:

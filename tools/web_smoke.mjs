@@ -192,6 +192,18 @@ await new Promise((r) => setTimeout(r, 200));
 must(copied && copied.includes('QTTS BUNDLE START') && copied.includes('FILES = {'),
   'the copy button must copy the REAL runnable yuyinkelong bundle');
 
+// the mini bootstrap cell must copy too (paste-safe ~1 kB alternative)
+let copiedMini = null;
+w.navigator.clipboard.writeText = async (t) => { copiedMini = t; };
+const miniBtn = doc.querySelector('#btnCopyMini');
+must(!!miniBtn, 'the mini bootstrap cell must exist');
+miniBtn?.dispatchEvent(new w.Event('click', { bubbles: true }));
+await new Promise((r) => setTimeout(r, 120));
+must(copiedMini && copiedMini.includes('yuyinkelong') && copiedMini.includes('exec(compile('),
+  'the mini cell must copy a paste-safe downloader+runner');
+must(doc.querySelector('#simMini')?.textContent?.includes('urllib.request'),
+  'the mini cell source must be visible');
+
 // the lab speak button must synthesise and report the first-audio time
 doc.querySelector('[data-tab="lab"]').dispatchEvent(new w.Event('click', { bubbles: true }));
 await new Promise((r) => setTimeout(r, 80));
