@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07080A">
+<meta name="description" content="QTTS — Qwen3-TTS 1.7B voice cloning on 2× NVIDIA T4. Sub-second first audio, interruptible voice chat, a browser launchpad for Kaggle.">
+<title>QTTS · Qwen3-TTS 1.7B on dual T4</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2307080A'/%3E%3Crect x='15' y='9' width='2' height='14' rx='1' fill='%23D9FF3F'/%3E%3C/svg%3E">
+<script>
+/* Inline diagnostics (runs before any module): surface script load failures
+   and runtime errors as a visible, clickable banner instead of a silently
+   dead page where buttons do nothing. */
+(function () {
+  var errs = [];
+  window.__qttsErrors = errs;
+  function show() {
+    var el = document.getElementById('qttsErr');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'qttsErr';
+      el.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:99;max-width:min(92vw,520px);' +
+        'background:#2a0b0f;border:1px solid #ff6b6b;color:#ffd7d7;border-radius:12px;padding:12px 14px;' +
+        'font:12px/1.6 ui-monospace,SFMono-Regular,monospace;white-space:pre-wrap;cursor:pointer';
+      document.body.appendChild(el);
+    }
+    el.textContent = '⚠ 页面资源未完整加载，部分功能不可用\n' +
+      errs.slice(0, 3).join('\n') +
+      '\n\n[点击此处刷新页面重试]';
+    el.onclick = function () { location.reload(); };
+  }
+  function record(msg) {
+    errs.push(String(msg));
+    if (document.body) show();
+    else document.addEventListener('DOMContentLoaded', show);
+  }
+  window.addEventListener('error', function (e) {
+    if (e.target && (e.target.src || e.target.href)) {
+      record('资源加载失败: ' + (e.target.src || e.target.href));
+    } else if (e.message) {
+      record('运行错误: ' + e.message);
+    }
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    record('异步错误: ' + ((e.reason && e.reason.message) || e.reason));
+  });
+})();
+</script>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════ topbar -->
+<header class="topbar">
+  <div class="shell topbar__inner">
+    <a class="brand" href="#" data-goto="lab">
+      <span class="brand__mark"><i></i><i></i><i></i></span>
+      <span class="brand__name">Q<span>TTS</span></span>
+    </a>
+
+    <nav class="nav" role="tablist" aria-label="主导航">
+      <button role="tab" data-tab="lab" aria-selected="true"><span>声音实验室</span></button>
+      <button role="tab" data-tab="chat" aria-selected="false"><span>语音聊天</span></button>
+      <button role="tab" data-tab="sim"  aria-selected="false"><span>Launchpad</span></button>
+    </nav>
+
+    <div class="status" id="status" title="gateway / workers / RTF">
+      <i class="dot" id="statusDot"></i>
+      <span id="statusText">连接中…</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ════════════════════════════════════════════════════════════ hero -->
+  <section class="hero">
+    <canvas class="hero__canvas" id="heroCanvas" aria-hidden="true"></canvas>
+    <div class="shell hero__grid">
+      <div>
+        <p class="eyebrow eyebrow--acid">Qwen3-TTS 12Hz 1.7B · 2× NVIDIA T4 · 24 kHz PCM</p>
+        <h1 class="display">
+          <span class="line" style="--d:0"><span>克隆声音，</span></span>
+          <span class="line" style="--d:1"><span>让机器<em>开口</em>。</span></span>
+        </h1>
+        <p class="lede">
+          把一段参考音频变成一个可实时对话的声音。流式分句在两块 T4 上并行合成，
+          首包音频亚秒级抵达，任意时刻开口即可打断 —— 全程同一个克隆音色。
+        </p>
+        <div class="hero__meta">
+          <div><b id="mFirst">—<i> ms</i></b><small>首包音频</small></div>
+          <div><b id="mRtf">—<i>×</i></b><small>实时倍率</small></div>
+          <div><b id="mGpu">—<i> / 2</i></b><small>在线 GPU</small></div>
+          <div><b id="mSeg">—</b><small>本轮分句</small></div>
+        </div>
+      </div>
+
+      <aside class="hero__card">
+        <h3>实时管线 · Live pipeline</h3>
+        <div class="hero__rows">
+          <div class="hero__row">
+            <label>ASR 转写</label><output id="hpAsr">待机</output>
+          </div>
+          <div class="meter meter--cyan"><i id="hpAsrBar"></i></div>
+          <div class="hero__row">
+            <label>DeepSeek V4 流式</label><output id="hpLlm">待机</output>
+          </div>
+          <div class="meter"><i id="hpLlmBar"></i></div>
+          <div class="hero__row">
+            <label>韵律分句</label><output id="hpSeg">待机</output>
+          </div>
+          <div class="meter"><i id="hpSegBar"></i></div>
+          <div class="hero__row">
+            <label>TTS 合成 (2×T4)</label><output id="hpTts">待机</output>
+          </div>
+          <div class="meter meter--amber"><i id="hpTtsBar"></i></div>
+          <div class="hero__row">
+            <label>播放</label><output id="hpPlay">待机</output>
+          </div>
+          <div class="meter"><i id="hpPlayBar"></i></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee__in">
+      <span>Zero-shot voice cloning</span><span>Parallel prosody segmentation</span>
+      <span>Barge-in interruptible</span><span>24 kHz mono PCM</span>
+      <span>ECAPA · F0 · CER · spectral distance</span><span>Rust DSP runtime</span>
+      <span>Go gateway</span><span>Kaggle one-cell deploy</span>
+      <span>Zero-shot voice cloning</span><span>Parallel prosody segmentation</span>
+      <span>Barge-in interruptible</span><span>24 kHz mono PCM</span>
+      <span>ECAPA · F0 · CER · spectral distance</span><span>Rust DSP runtime</span>
+      <span>Go gateway</span><span>Kaggle one-cell deploy</span>
+    </div>
+  </div>
+
+  <div class="shell tabs">
+    <!-- ══════════════════════════════════════════════════════ TAB: LAB -->
+    <section class="tabpanel" id="panel-lab" data-active>
+      <div class="section">
+        <div class="section__head">
+          <div>
+            <p class="eyebrow">01 / Voice laboratory</p>
+            <h2 class="h1">先造一个声音，<br>再让它说话。</h2>
+          </div>
+          <p class="lede">
+            上传 10–30 秒清晰人声，系统会自动降噪、切片、估计基频并提取声纹嵌入；
+            质量报告给出可复现的客观指标，而不是一个无法验证的百分比。
+          </p>
+        </div>
+
+        <div class="grid grid--2">
+          <div class="stack gap-3">
+            <div class="card">
+              <div class="card__title"><span class="idx">01</span><h3 class="h3">参考音频</h3></div>
+              <div class="drop" id="drop" tabindex="0" role="button">
+                <svg class="drop__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M3.5 15v2.5A2.5 2.5 0 0 0 6 20h12a2.5 2.5 0 0 0 2.5-2.5V15" stroke-linecap="round"/>
+                </svg>
+                <h3>拖入音频，或点击选择</h3>
+                <p class="small">WAV / MP3 / FLAC / M4A · 建议 10–30 秒 · 单人普通话</p>
+                <input type="file" id="file" class="hidden-file" accept="audio/*" multiple>
+              </div>
+              <div class="grid grid--2" style="margin-top:18px">
+                <div class="field">
+                  <label for="pName">声音名称</label>
+                  <input class="input" id="pName" placeholder="例如：我的声音" value="">
+                </div>
+                <div class="field">
+                  <label for="pLang">语言</label>
+                  <select class="select" id="pLang">
+                    <option value="chinese">中文 Mandarin</option>
+                    <option value="english">English</option>
+                    <option value="japanese">日本語</option>
+                    <option value="korean">한국어</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field" style="margin-top:14px">
+                <label for="pText">参考文本（可选，ICL 克隆时强烈建议填写）</label>
+                <textarea class="textarea" id="pText" placeholder="逐字写下参考音频里说的话，模型会据此对齐音素，提升克隆保真度。"></textarea>
+              </div>
+              <div class="row between" style="margin-top:18px">
+                <label class="switch">
+                  <input type="checkbox" id="pCal" checked><i></i>
+                  <span>自动校准响度并做质量体检</span>
+                </label>
+                <button class="btn btn--primary" id="btnBuild">
+                  <svg class="btn__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M12 3v18M3 12h18" stroke-linecap="round"/>
+                  </svg>
+                  生成声纹
+                </button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card__title"><span class="idx">02</span><h3 class="h3">声纹库</h3>
+                <span class="pill" id="profCount">0 个</span></div>
+              <div id="profList" class="stack gap-2"></div>
+              <p class="small" id="profEmpty" style="margin-top:8px">
+                还没有声音。上传一段参考音频开始。
+              </p>
+            </div>
+          </div>
+
+          <div class="stack gap-3">
+            <div class="card">
+              <div class="card__title"><span class="idx">03</span><h3 class="h3">质量报告</h3>
+                <span class="pill" id="qBadge">等待数据</span></div>
+              <div class="grid grid--2" id="qStats">
+                <div class="stat"><b id="qCos">—</b><small>ECAPA 余弦相似度</small></div>
+                <div class="stat"><b id="qCer">—</b><small>字符错误率 CER</small></div>
+                <div class="stat"><b id="qF0">—</b><small>基频偏差 (semitone)</small></div>
+                <div class="stat"><b id="qRate">—</b><small>语速比</small></div>
+              </div>
+              <hr class="hr">
+              <div class="stack gap-2">
+                <div class="hero__row"><label>频谱距离 (mel)</label><output id="qSpec">—</output></div>
+                <div class="meter meter--cyan"><i id="qSpecBar"></i></div>
+                <div class="hero__row"><label>克隆保真指数 (内部)</label><output id="qFid">—</output></div>
+                <div class="meter"><i id="qFidBar"></i></div>
+              </div>
+              <p class="small" style="margin-top:16px">
+                说明：坊间流传的“99.5% 相似度”无法被客观测量与复现，本系统不提供此类数字。
+                这里的每一项都来自可重跑的测量：说话人嵌入余弦、字��错误率、基频偏移、语速比与 mel 频谱距离。
+              </p>
+            </div>
+
+            <div class="card">
+              <div class="card__title"><span class="idx">04</span><h3 class="h3">试听</h3></div>
+              <div class="field">
+                <label for="tText">用这个声音说</label>
+                <textarea class="textarea" id="tText" placeholder="输入任何文字，会用选中的克隆声音朗读。">你好，这是一次克隆声音的试听。</textarea>
+              </div>
+              <div class="row gap-2" style="margin-top:14px">
+                <button class="btn" id="btnSpeak">▶ 朗读</button>
+                <button class="btn btn--ghost btn--sm" id="btnStop">■ 停止</button>
+                <span class="small mono" id="speakInfo"></span>
+              </div>
+              <div class="wave" id="wavePreview" style="margin-top:16px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════ TAB: CHAT -->
+    <section class="tabpanel" id="panel-chat">
+      <div class="section">
+        <div class="section__head">
+          <div>
+            <p class="eyebrow">02 / Voice conversation</p>
+            <h2 class="h1">说话，或者<em style="font-family:var(--ff-display);color:var(--acid)">打断它。</em></h2>
+          </div>
+          <p class="lede">
+            浏览器端能量 VAD 自动断句，录音上传到本地 ASR；DeepSeek V4 流式作答，
+            韵律分句后由两块 T4 并行合成。你在它说话时再次开口，会立刻掐断当前回答。
+          </p>
+        </div>
+
+        <div class="chat">
+          <div class="chat__stage">
+            <div class="chat__log" id="chatLog">
+              <div class="msg msg--me"><div class="msg__av">你</div><div>
+                <div class="msg__bub">按下麦克风开始说话，或者直接用下面的输入框。</div>
+                <div class="msg__meta"><span>系统</span></div>
+              </div></div>
+            </div>
+
+            <div class="barge" id="barge">
+              <span>检测到你开始说话 —— 正在打断当前回答…</span>
+              <button class="btn btn--sm btn--ghost barge__btn" id="btnBarge">立即打断</button>
+            </div>
+
+            <div class="row gap-3" style="align-items:flex-end">
+              <div class="mic">
+                <button class="mic__btn" id="btnMic" aria-label="按住说话">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                    <rect x="9" y="2.5" width="6" height="11" rx="3"/>
+                    <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21m-3 0h6" stroke-linecap="round"/>
+                  </svg>
+                </button>
+                <div class="level" id="level"></div>
+                <div class="mic__hint" id="micHint">点击开始 · 空格键切换</div>
+              </div>
+
+              <div class="grow stack gap-2">
+                <textarea class="textarea" id="chatInput" rows="1"
+                  placeholder="也可以直接打字，回车发送（Shift+回车换行）"></textarea>
+                <div class="row between">
+                  <div class="row gap-2">
+                    <select class="select" id="chatTone" style="width:auto">
+                      <option value="concise">简洁</option>
+                      <option value="detailed">详尽</option>
+                      <option value="story">讲故事</option>
+                    </select>
+                    <select class="select" id="chatLang" style="width:auto">
+                      <option value="auto">自动</option>
+                      <option value="chinese">中文</option>
+                      <option value="english">English</option>
+                    </select>
+                  </div>
+                  <button class="btn btn--primary" id="btnSend">发送</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="stack gap-3">
+            <div class="card">
+              <div class="card__title"><h3 class="h3">管线状态</h3></div>
+              <div class="pipe" id="pipe">
+                <div class="pipe__st" data-k="asr"><i></i><span class="pipe__t">ASR 转写</span><span class="pipe__v">待机</span></div>
+                <div class="pipe__st" data-k="llm"><i></i><span class="pipe__t">DeepSeek V4</span><span class="pipe__v">待机</span></div>
+                <div class="pipe__st" data-k="seg"><i></i><span class="pipe__t">韵律分句</span><span class="pipe__v">待机</span></div>
+                <div class="pipe__st" data-k="tts"><i></i><span class="pipe__t">TTS 合成</span><span class="pipe__v">待机</span></div>
+                <div class="pipe__st" data-k="play"><i></i><span class="pipe__t">播放</span><span class="pipe__v">待机</span></div>
+              </div>
+              <hr class="hr">
+              <div class="stack gap-2">
+                <div class="hero__row"><label>缓冲区</label><output id="stBuf">0.0 s</output></div>
+                <div class="meter"><i id="stBufBar"></i></div>
+                <div class="hero__row"><label>首包延迟</label><output id="stFirst">—</output></div>
+                <div class="hero__row"><label>本轮实时倍率</label><output id="stRtf">—</output></div>
+                <div class="hero__row"><label>欠载次数</label><output id="stUnder">0</output></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card__title"><h3 class="h3">语音</h3></div>
+              <div class="stack gap-2">
+                <div class="hero__row"><label>当前音色</label><output id="stVoice">未选择</output></div>
+                <div class="hero__row"><label>DeepSeek</label><output id="stModel">—</output></div>
+                <div class="hero__row"><label>密钥</label><output id="stKey">—</output></div>
+              </div>
+              <hr class="hr">
+              <div class="stack gap-2">
+                <label class="switch"><input type="checkbox" id="optAuto" checked><i></i>
+                  <span>静音 800ms 自动发送</span></label>
+                <label class="switch"><input type="checkbox" id="optBarge" checked><i></i>
+                  <span>说话时自动打断</span></label>
+                <label class="switch"><input type="checkbox" id="optHist" checked><i></i>
+                  <span>携带对话历史</span></label>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════ TAB: SIM -->
+    <section class="tabpanel" id="panel-sim">
+      <div class="section">
+        <div class="section__head">
+          <div>
+            <p class="eyebrow">03 / Launchpad</p>
+            <h2 class="h1">复制，粘贴，<br>就跑起来了。</h2>
+          </div>
+          <p class="lede">
+            这一页就是你的部署说明书。下面每一格都可以直接复制进 Kaggle Notebook；
+            也可以直接下载那个单文件部署包，一次性带走上游全部源码。
+          </p>
+        </div>
+
+        <div class="card simopen" style="padding:22px; margin-bottom: 22px;">
+          <div>
+            <b>🌐 浏览器模拟器</b>
+            <p class="small" style="margin-top:6px">
+              不上 Kaggle 也能先看效果：模拟器页面与 Kaggle 运行的网站<b>同一套页面源码</b>，
+              内置部署态数据（双 T4、克隆音色、延迟指标），在浏览器里直接打开即可交互。
+              模拟器里的「复制」给出的就是<b>真实可运行的 yuyinkelong 部署包</b>，粘进 Kaggle 单元格即跑。
+            </p>
+          </div>
+          <a class="btn btn--primary" href="sim.html">▶ 打开网站模拟器</a>
+        </div>
+
+        <div class="grid grid--2">
+          <div class="stack gap-3">
+            <div class="steps" id="steps">
+              <div class="step" data-s="1">
+                <div class="step__n">1</div>
+                <div>
+                  <h4>新建 Notebook 并开启 GPU</h4>
+                  <p>右侧 → Add New → Notebook。右上角 ⚙ → Accelerator → <b>GPU T4 ×2</b>，
+                     Internet → <b>On</b>。这决定我们能否跑满双卡并行。</p>
+                </div>
+              </div>
+              <div class="step" data-s="2">
+                <div class="step__n">2</div>
+                <div>
+                  <h4>添加密钥（可选但强烈建议）</h4>
+                  <p>右上角 ⚙ → Secrets → Add Secret：<code class="mono">DEEPSEEK_API_KEY</code>、
+                     <code class="mono">HF_TOKEN</code>。没有 LLM 密钥也能用，只是无法进行语音对话。</p>
+                </div>
+              </div>
+              <div class="step" data-s="3">
+                <div class="step__n">3</div>
+                <div>
+                  <h4>粘贴下面这一格并运行</h4>
+                  <p>它会自解压全部源码、按 CUDA 版本装依赖（不破坏预装的 torch）、
+                     预下载模型、编译 Go 网关与 Rust 运行时，然后拉起服务并给出公网地址。</p>
+                </div>
+              </div>
+              <div class="step" data-s="4">
+                <div class="step__n">4</div>
+                <div>
+                  <h4>打开控制台</h4>
+                  <p>运行结束后 Notebook 输出里的 trycloudflare 链接就是控制台。
+                     首次运行需要下载 6.7 GB 模型，请耐心等待。</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card__title"><span class="idx">!</span><h3 class="h3">运行状态自检</h3></div>
+              <div class="console" id="simConsole">
+<span class="t">$ qtts selftest --live</span>
+<span class="t">等待网关…</span>
+              </div>
+              <div class="row gap-2" style="margin-top:14px">
+                <button class="btn btn--sm" id="btnSimCheck">▶ 运行自检</button>
+                <a class="btn btn--sm btn--ghost" href="/deploy/bundle" download="yuyinkelong">↓ 下载单文件部署包</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="stack gap-3">
+            <div class="card" style="border-color: rgba(217,255,63,.35)">
+              <div class="card__title"><span class="idx">⚡</span><h3 class="h3">小引导格（推荐 · 约 1 KB）</h3>
+                <span class="pill pill--good">粘贴永不截断</span></div>
+              <div class="code">
+                <div class="code__bar">
+                  <b>bootstrap_cell.py</b>
+                  <span class="grow"></span>
+                  <button class="btn btn--sm btn--primary copy" id="btnCopyMini" data-done="0">
+                    <svg class="btn__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                      <rect x="9" y="9" width="11" height="11" rx="2.5"/>
+                      <path d="M5 15V6a2 2 0 0 1 2-2h8" />
+                    </svg>
+                    复制小引导格
+                  </button>
+                </div>
+                <pre id="simMini" class="mono"></pre>
+              </div>
+              <p class="small" style="margin-top:12px">
+                只复制这一小格进 Kaggle 即可：它会从多个镜像自动下载完整部署包并执行。
+                <b>不受粘贴截断影响</b>，国内网络也可用；下方是完整单文件（约 230 KB）。
+              </p>
+            </div>
+
+            <div class="card">
+              <div class="card__title"><span class="idx">⌘</span><h3 class="h3">Kaggle 部署单元格（完整单文件）</h3>
+                <span class="pill" id="simLen">—</span></div>
+              <div class="code">
+                <div class="code__bar">
+                  <b>deploy_yuyinkelong.ipynb</b>
+                  <span class="grow"></span>
+                  <button class="btn btn--sm copy" id="btnCopy" data-done="0">
+                    <svg class="btn__ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                      <rect x="9" y="9" width="11" height="11" rx="2.5"/>
+                      <path d="M5 15V6a2 2 0 0 1 2-2h8"/>
+                    </svg>
+                    复制
+                  </button>
+                </div>
+                <pre id="simCode" class="mono"></pre>
+              </div>
+              <p class="small" style="margin-top:12px">
+                这段代码就是 <code class="mono">yuyinkelong</code> 的入口：它把内嵌的 37 个源文件
+                写到 <code class="mono">/kaggle/working/qtts</code>，然后执行 bootstrap。
+                复制时会<b>强制拉取最新版本</b>并显示指纹，杜绝旧代码混入。
+              </p>
+            </div>
+
+            <div class="card">
+              <div class="card__title"><span class="idx">⌥</span><h3 class="h3">等价命令（终端 / Docker）</h3></div>
+              <div class="code">
+                <div class="code__bar"><b>bash</b></div>
+                <pre class="mono" id="simShell"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer class="foot">
+  <div class="shell row between wrap gap-3">
+    <div class="stack gap-1">
+      <div class="brand">
+        <span class="brand__mark"><i></i><i></i><i></i></span>
+        <span class="brand__name">Q<span>TTS</span></span>
+      </div>
+      <p class="small">Qwen3-TTS 1.7B 零样本音色克隆 · Go 网关 · Rust DSP 运行时 · Python 推理</p>
+    </div>
+    <div class="stack gap-1" style="text-align:right">
+      <p class="small mono" id="footInfo">—</p>
+      <p class="small">MIT · 本页所有指标均来自可重跑的真实测量</p>
+    </div>
+  </div>
+</footer>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
