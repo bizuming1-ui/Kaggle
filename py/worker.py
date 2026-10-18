@@ -216,6 +216,16 @@ class RealEngine:
         import torch
         from faster_qwen3_tts import FasterQwen3TTS
 
+        # transformers >= 5.15 moved MimiConfig.rope_theta into
+        # rope_parameters; qwen_tts' fallback RoPE initializer still reads
+        # the attribute and crashes the load (see py/compat.py). Patch the
+        # registry after the import above registered the fragile version,
+        # before any model construction.
+        from compat import apply_transformers_rope_compat
+
+        report = apply_transformers_rope_compat()
+        log.info("rope compat: %s", report)
+
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA not available in worker (torch.cuda.is_available() is False)")
         torch.backends.cuda.matmul.allow_tf32 = True
@@ -361,6 +371,7 @@ class Worker:
         self.engine = MockEngine(ARGS.gpu) if MOCK else RealEngine(ARGS.gpu)
         self.ready = False
         self.error: str | None = None
+        self.error_tb: str | None = None
         self.lock = threading.Lock()
         self.busy = False
         self.last_progress = time.time()
@@ -381,7 +392,12 @@ class Worker:
             self.ready = True
             log.info("worker ready (engine=%s rt=%s)", self.engine.name, audio_rt.BACKEND)
         except Exception as e:  # noqa: BLE001
+            import traceback
+
             self.error = f"{type(e).__name__}: {e}"
+            # keep the tail of the traceback so the gateway/bootstrap can
+            # show WHERE it failed, not just the exception message.
+            self.error_tb = "".join(traceback.format_exception(e))[-3000:]
             log.exception("engine load failed")
 
     def load_profile(self, pid: str) -> dict:
@@ -596,7 +612,7 @@ def _restart_watch():
 @app.get("/health")
 async def health():
     d = {
-        "gpu": ARGS.gpu, "ready": W.ready, "error": W.error, "busy": W.busy, "engine": W.engine.name,
+        "gpu": ARGS.gpu, "ready": W.ready, "error": W.error, "error_tb": W.error_tb, "busy": W.busy, "engine": W.engine.name,
         "dtype": W.engine.dtype_name, "rt": audio_rt.BACKEND, "served": W.served, "failed": W.failed,
         "rtf_x": round(W.rtf.get(0.0), 3), "first_chunk_ms": round(W.ttfa.get(0.0), 1),
         "idle_for_s": round(time.time() - W.last_progress, 1), "uptime_s": round(time.time() - W.started, 1),

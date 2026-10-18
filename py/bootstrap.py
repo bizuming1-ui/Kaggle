@@ -262,6 +262,12 @@ def wait_ready(n_workers: int, timeout_s: int = 1800) -> bool:
                 st = [(w["id"], "ready" if w.get("ready") else ((w.get("worker") or {}).get("error")
                       or w.get("last_error") or "loading")) for w in h.get("workers", [])]
                 print(f"   [{time.time() - T0:6.0f}s] workers: {st}", flush=True)
+                for w in h.get("workers", []):
+                    tb = (w.get("worker") or {}).get("error_tb")
+                    if tb and w.get("id") not in seen_tb:
+                        seen_tb.add(w.get("id"))
+                        print(f"   --- worker {w.get('id')} traceback (tail) ---\n"
+                              + "\n".join(str(tb).splitlines()[-8:]), flush=True)
         except Exception:  # noqa: BLE001
             if time.time() - last > 15:
                 last = time.time()
@@ -415,7 +421,8 @@ def main() -> int:
     print("\n" + "═" * 70)
     print(f"✓ QTTS ready in {time.time() - T0:.0f}s   GPUs: {n_workers}   "
           f"Rust runtime: {'on' if rust_ok else 'numpy fallback'}")
-    print(f"  Open this URL:  {url or local}")
+    print(f"  ★★★ 语音克隆系统网址（在浏览器打开）:  {url or local}  ★★★")
+    print(f"  Open this URL:  {url or local}   (also saved in {STATE / 'url.txt'})")
     print("  1) 声音实验室: 上传参考音频 → 自动处理 → 启用   2) 语音聊天: 麦克风直接对话   3) 语音合成: 打字朗读")
     print("  Monitor: python {}/tools/selftest.py --quality   |   logs: {}".format(ROOT, LOGS))
     print("═" * 70)

@@ -109,14 +109,26 @@ Kaggle `GPU T4 x2` 上：
   ③ 前端复制按钮强制拉取最新 + 指纹校验（杜绝页面旧缓存）；④ Launchpad 提供 1 KB 小引导格（多镜像下载+执行，抗粘贴截断）。
 
 ## 7. **尚未**在真实 T4×2 上验证（第一次运行必须看的点）
-- faster-qwen3-tts 0.5.4 在 Kaggle 当前 torch/transformers 组合下的安装与 CUDA Graph 捕获
-  （`py/deps.py` 会自动对齐 torchaudio 版本并在失败时给出确切命令）。
+- ~~faster-qwen3-tts 0.5.4 在 Kaggle 当前 transformers 组合下崩溃~~ **已定版修复（2026-10 真机日志确认）**：
+  Kaggle 上 pip 把 transformers 浮动升级到 5.20.1 后，worker 加载即报
+  `AttributeError: 'MimiConfig' object has no attribute 'rope_theta'` 并被 supervisor 无限重启。
+  根因：qwen-tts-hf 的回退 RoPE 初始化器读 `config.rope_theta`，而 transformers ≥5.15 已把该值
+  迁入 `MimiConfig.rope_parameters`（本地用真实 wheel 一字不差复现，见 `tools/rope_compat_check.py`）。
+  修复双保险：`py/deps.py` 约束锁定作者测试组合（transformers 5.18.0 / accelerate 1.12.0 /
+  faster-qwen3-tts 0.5.4）；`py/compat.py` 在 worker 加载前把 `ROPE_INIT_FUNCTIONS["default"]`
+  换成健壮实现并给 MimiConfig 补 `rope_theta` 属性，版本再漂移也不会同类崩溃。
+  仍待真机验证的只剩 CUDA Graph 捕获与真实 RTF/首包数值。
 - FP16 数值稳定性（Worker 自检并按 sm75 链 fp16→fp32 降级）。
 - 真实 RTF/首包：运行 `python tools/selftest.py --quality`，把结果发回即可据此调参（chunk_size、水位、temperature）。
 - ECAPA/speechbrain 与 faster-whisper(cuDNN) 在 Kaggle 的兼容性（都有回退：MFCC 代理 / CPU 小模型，回退会降低评测可信度）。
 - cloudflared 隧道对长连接 POST 流的缓冲（网关已设 `X-Accel-Buffering: no` 并逐帧 Flush）。
 
 ## 8. 排错速查
+- **Kaggle 上 worker 反复报 `AttributeError: 'MimiConfig' object has no attribute 'rope_theta'`**：
+  transformers 版本浮动导致的 RoPE 兼容崩溃（见 §7）。新版本已双保险修复（deps 锁 5.18.0 +
+  `py/compat.py` 运行时垫片，worker 加载前自动生效）；若仍出现，先确认运行的是最新复制的代码
+  （整包有指纹，旧代码请重新到预览页复制），并把 worker 的 `error_tb` 完整 traceback 发回。
+  本地自证：`python tools/rope_compat_check.py`（复现原崩溃 + 验证修复）。
 - **预览页显示「连接中…」/代码框空白/按钮无反应**：预览背后的服务已随沙箱回收（页面只剩浏览器缓存）。
   恢复：`bash tools/dev_env.sh`（重建 /tmp 运行时 + setsid 守护进程拉起整栈）。页面顶部的红色浮层会提示资源加载失败。
 - **点「复制」没反应/提示浏览器限制**：页面会自动选中代码并提示按 Ctrl+C（Mac ⌘C）；或用「小引导格」按钮（零网络即可复制）。

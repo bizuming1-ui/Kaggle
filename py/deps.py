@@ -187,6 +187,11 @@ def build_constraints(p: Probe, path: Path) -> list[str]:
     # every numpy from 1.22 up and keeps the ABI stable.
     lines.append("librosa>=0.10.2,<1.0")
     lines.append("numba>=0.57")
+    # Freeze the TTS stack combo (see TRANSFORMERS_PIN above): an unpinned
+    # `pip install faster-qwen3-tts` otherwise upgrades transformers to the
+    # newest 5.x, which the upstream combo was never tested against.
+    lines.append(f"transformers=={TRANSFORMERS_PIN}")
+    lines.append(f"accelerate=={ACCELERATE_PIN}")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return lines
