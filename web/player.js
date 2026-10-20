@@ -16,13 +16,26 @@ class QTTSProcessor extends AudioWorkletProcessor {
     this.cap  = 1 << 18;            // 262144 samples (~11 s @ 24 kHz)
     this.buf  = new Float32Array(this.cap);
     this.w = 0; this.r = 0;
-    this.eos = false; this.primed = false; this.done = false;
+    this.eos = false; this.done = false;
     this.t0 = 0; this.frames = 0;
+    // ---- priming state machine --------------------------------------
+    // Rendering used to start on the very first 128-sample block, so the
+    // first ~250 ms chunk played out and the stream audibly stalled
+    // ("one word, pause, then it continues").  Now a jitter cushion is
+    // pre-rolled before anything renders, and if the ring ever runs dry
+    // mid-stream we re-prime with a growing cushion instead of sputtering
+    // on every late chunk — generation and playback overlap smoothly.
+    this.started = false;           // currently rendering audio
+    this.emptyAt = 0;               // when the ring first ran dry (grace timer)
+    this.firstPcmAt = 0;            // currentTime of first PCM since (re)prime
+    this.primeNeed = 24000;         // samples to cushion before starting: 1.0 s
+    this.announcedFirst = false;    // 'first' sent for this stream
     this.port.onmessage = (e) => {
       const m = e.data;
       if (m.type === 'pcm') {
         const src = m.data;
-        const free = this.cap - (this.w - this.r + this.cap) % this.cap;
+        if (!this.firstPcmAt) this.firstPcmAt = currentTime;
+        const free = this.cap - this.queued();
         if (src.length > free) {          // overflow: drop the oldest audio
           this.r = (this.r + (src.length - free)) % this.cap;
         }
@@ -30,38 +43,75 @@ class QTTSProcessor extends AudioWorkletProcessor {
           this.buf[(this.w + i) % this.cap] = src[i];
         }
         this.w = (this.w + src.length) % this.cap;
-        this.primed = true;
       } else if (m.type === 'eos') {
         this.eos = true;
       } else if (m.type === 'reset') {
-        this.w = this.r = 0; this.eos = false; this.primed = false; this.done = false;
+        this.w = this.r = 0; this.eos = false; this.done = false;
+        this.started = false; this.firstPcmAt = 0; this.announcedFirst = false;
+        this.emptyAt = 0;
+        this.primeNeed = 24000;
         this.t0 = 0; this.frames = 0;
       }
     };
   }
+
+  queued() { return (this.w - this.r + this.cap) % this.cap; }
+
   process(inputs, outputs) {
     const out = outputs[0][0];
     const n = out.length;
-    const avail = (this.w - this.r + this.cap) % this.cap;
+    const avail = this.queued();
+    if (!this.started) {
+      // Start when: cushion full, OR we have waited 900 ms since the first
+      // PCM (keeps first-audio latency low on slow starts), OR the stream
+      // already ended.  All three stay far inside the 3 s first-audio cap.
+      const waited = this.firstPcmAt ? (currentTime - this.firstPcmAt) : 0;
+      if (avail >= this.primeNeed || (avail > 0 && waited >= 0.9) || (this.eos && avail > 0)) {
+        this.started = true;
+      } else {
+        out.fill(0);
+        return true;
+      }
+    }
     if (avail < n) {
       if (avail > 0) { for (let i = 0; i < avail; i++) out[i] = this.buf[(this.r + i) % this.cap]; }
       out.fill(0, avail);
       this.r = this.w;
-      if (this.primed && !this.done) {
-        this.done = true;
-        this.port.postMessage({ type: this.eos ? 'drained' : 'underrun', at: currentTime });
+      if (this.eos) {
+        if (!this.done) { this.done = true; this.port.postMessage({ type: 'drained', at: currentTime }); }
+        this.started = false; this.firstPcmAt = 0; this.primeNeed = 24000; this.emptyAt = 0;
+        return true;
       }
+      // Not end-of-stream: give the producer a 120 ms grace period before
+      // calling it an underrun (the END frame often lands a few ms after
+      // the last PCM).  A shortfall inside the grace window is inaudible
+      // scheduling noise, not a stall.
+      if (!this.emptyAt) { this.emptyAt = currentTime; return true; }
+      if (currentTime - this.emptyAt < 0.12) return true;
+      // Truly ran dry mid-stream: report ONE underrun and re-prime with a
+      // bigger cushion (1.0 -> 1.4 -> 2.0 s cap), then resume smoothly.
+      this.port.postMessage({ type: 'underrun', at: currentTime });
+      this.started = false;
+      this.firstPcmAt = 0;
+      this.emptyAt = 0;
+      this.done = false;
+      this.primeNeed = Math.min(48000, Math.round(this.primeNeed * 1.4));
       return true;
     }
+    this.emptyAt = 0;
     for (let i = 0; i < n; i++) out[i] = this.buf[(this.r + i) % this.cap];
     this.r = (this.r + n) % this.cap;
     this.frames += n;
-    if (this.frames === n) { this.t0 = currentTime; this.port.postMessage({ type: 'first', at: currentTime }); }
+    if (!this.announcedFirst) {
+      this.announcedFirst = true;
+      this.t0 = currentTime;
+      this.port.postMessage({ type: 'first', at: currentTime });
+    }
     if ((this.frames / n | 0) % 3 === 0) {
       let s = 0;
       for (let i = 0; i < n; i++) s += out[i] * out[i];
       this.port.postMessage({ type: 'level', rms: Math.sqrt(s / n), at: currentTime,
-                              queued: (this.w - this.r + this.cap) % this.cap });
+                              queued: this.queued() });
     }
     return true;
   }
@@ -106,10 +156,29 @@ export class QTTSPlayer {
     this.node.connect(this.ctx.destination);
     this.node.port.onmessage = (e) => this._onWorklet(e.data);
     this.resampleRatio = this.ctx.sampleRate / SR;
-    if (this.ctx.state === 'suspended') await this.ctx.resume();
+    this.ctx.onstatechange = () => this.opts.onStateChange?.(this.ctx.state);
+    // Page load is not a user gesture, so this resume() usually leaves the
+    // context 'suspended' (Chrome autoplay policy). unlock() re-runs it
+    // inside a real gesture; without it the worklet never renders.
+    if (this.ctx.state === 'suspended') { try { await this.ctx.resume(); } catch (_) { /* needs gesture */ } }
     this.ready = true;
     return this;
   }
+
+  /* Call from ANY user gesture (click / keydown / send / mic). Idempotent
+     and safe when audio is unavailable (jsdom, very old browsers). */
+  async unlock() {
+    try {
+      await this.init();
+      if (this.ctx && this.ctx.state === 'suspended') await this.ctx.resume();
+      this.opts.onStateChange?.(this.ctx?.state);
+      return this.ctx?.state || 'unavailable';
+    } catch (_) {
+      return 'unavailable';
+    }
+  }
+
+  get state() { return this.ctx?.state || 'unavailable'; }
 
   _onWorklet(m) {
     if (m.type === 'level') {
@@ -118,6 +187,7 @@ export class QTTSPlayer {
       this.opts.onLevel?.(m.rms);
     } else if (m.type === 'first') {
       this.firstAudioAt = m.at;
+      this._firstMsgAt = performance.now();
       this.opts.onFirstAudio?.(m.at);
     } else if (m.type === 'underrun') {
       this.underruns++;
@@ -132,6 +202,7 @@ export class QTTSPlayer {
     this.streamOpen = true;
     this.underruns = 0;
     this.firstAudioAt = 0;
+    this._firstMsgAt = 0;
     this.startedAt = performance.now();
     this.node?.port.postMessage({ type: 'reset' });
   }
@@ -195,8 +266,10 @@ export class QTTSPlayer {
   get level() { return this._level; }
   get elapsedMs() { return performance.now() - this.startedAt; }
   get firstAudioMs() {
-    if (!this.firstAudioAt) return 0;
-    return Math.max(0, (this.firstAudioAt - (this.startedAt / 1000)) * 1000);
+    // One clock only (performance.now): the worklet's currentTime runs on
+    // the audio clock and must never be mixed with the page clock.
+    if (!this._firstMsgAt) return 0;
+    return Math.max(0, this._firstMsgAt - this.startedAt);
   }
 }
 

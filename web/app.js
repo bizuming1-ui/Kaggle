@@ -103,9 +103,9 @@ function heroCanvas() {
       bars[i] += (target - bars[i]) * 0.22;
       const h = Math.max(2, bars[i] * r.height * 0.86);
       const g = ctx.createLinearGradient(0, r.height / 2 - h / 2, 0, r.height / 2 + h / 2);
-      g.addColorStop(0, 'rgba(217,255,63,0.0)');
-      g.addColorStop(0.5, `rgba(217,255,63,${0.30 + bars[i] * 0.5})`);
-      g.addColorStop(1, 'rgba(217,255,63,0.0)');
+      g.addColorStop(0, 'rgba(167,139,250,0.0)');
+      g.addColorStop(0.5, `rgba(167,139,250,${0.30 + bars[i] * 0.5})`);
+      g.addColorStop(1, 'rgba(167,139,250,0.0)');
       ctx.fillStyle = g;
       const y = r.height / 2 - h / 2;
       ctx.fillRect(i * bw + bw * 0.22, y, bw * 0.56, h);
@@ -453,8 +453,13 @@ async function boot() {
 
   state.player = new QTTSPlayer({
     onUnderrun: () => { const e = $('#stUnder'); if (e) e.textContent = String(++chatState.underruns); },
+    onStateChange: (st) => document.dispatchEvent(new CustomEvent('qtts-player-state', { detail: st })),
   });
   try { await state.player.init(); } catch (e) { console.warn('audio init failed', e); }
+  // First real gesture anywhere unlocks playback (autoplay policy); after
+  // that, replies stream audibly on their own, ChatGPT-style.
+  document.addEventListener('pointerdown', () => state.player?.unlock(), { capture: true });
+  document.addEventListener('keydown', () => state.player?.unlock(), { capture: true });
 
   step('status', async () => {
     await pollStatus();

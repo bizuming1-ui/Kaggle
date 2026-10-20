@@ -54,8 +54,23 @@ async function fingerprint(t) {
   }
 }
 
+async function loadInlineBundle() {
+  // The complete code is embedded in bundle-inline.js NEXT TO this page.
+  // It works with no gateway and no network (static hosting, previews,
+  // backend down).  On Kaggle that module is not shipped in the bundle,
+  // so the import fails and loadBundle() falls back to sim-bundle.txt and
+  // then the gateway copy — the pre-existing verified behaviour there.
+  try {
+    const mod = await import('./bundle-inline.js');
+    return looksRunnable(mod.BUNDLE_TEXT) ? mod.BUNDLE_TEXT : '';
+  } catch (_) {
+    return '';
+  }
+}
+
 export function initSimulator(state) {
   let bundle = '';
+  let bundleSource = '';
   let loaded = false;
 
   const codeEl = $('#simCode');
@@ -67,11 +82,28 @@ export function initSimulator(state) {
   async function loadBundle(force = false) {
     if (loaded && !force) return bundle;
     try {
-      const sig = (typeof AbortSignal !== 'undefined' && AbortSignal.timeout)
-        ? AbortSignal.timeout(8000) : undefined;
-      const res = await fetch('/deploy/bundle', { cache: 'no-store', signal: sig });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const txt = await res.text();
+      // 1) embedded module next to the page (no gateway, no network)
+      let txt = await loadInlineBundle();
+      bundleSource = txt ? '已内置于页面' : '';
+      // 2) plain-text copy next to the page (module-blocked environments)
+      if (!txt) {
+        try {
+          const r2 = await fetch('sim-bundle.txt', { cache: 'no-store' });
+          if (r2.ok) {
+            const t2 = await r2.text();
+            if (looksRunnable(t2)) { txt = t2; bundleSource = '已内置于页面'; }
+          }
+        } catch (_) { /* fall through to the gateway copy */ }
+      }
+      // 3) gateway live copy (the only source on Kaggle)
+      if (!txt) {
+        const sig = (typeof AbortSignal !== 'undefined' && AbortSignal.timeout)
+          ? AbortSignal.timeout(8000) : undefined;
+        const res = await fetch('/deploy/bundle', { cache: 'no-store', signal: sig });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        txt = await res.text();
+        bundleSource = '网关实时版本';
+      }
       if (!looksRunnable(txt)) throw new Error('内容不是可运行部署包');
       bundle = txt;
       loaded = true;
@@ -81,13 +113,14 @@ export function initSimulator(state) {
         const files = (bundle.match(/^    "[^"]+":/gm) || []).length;
         const fp = await fingerprint(bundle);
         const l = $('#simLen');
-        if (l) l.textContent = `${files} 文件 · ${kb} KB · ✓ 可直接运行 · 指纹 ${fp}`;
+        if (l) l.textContent = `${files} 文件 · ${kb} KB · ✓ 可直接运行 · ${bundleSource} · 指纹 ${fp}`;
       }
       step(1, true);
       return bundle;
     } catch (e) {
       loaded = false;
       bundle = '';
+      bundleSource = '';
       if (codeEl) codeEl.textContent =
         `# 部署包尚未就绪（${e.message}）\n# 请点「复制完整部署包」重试，或使用上方小引导格（从 GitHub 镜像下载）。`;
       return '';
@@ -149,9 +182,10 @@ export function initSimulator(state) {
       if (!looksRunnable(text)) text = await loadBundle(true);   // one honest retry
     }
     if (!looksRunnable(text)) {
+      // NEVER select the code box here: it may hold placeholder text and
+      // the user would unknowingly copy garbage into Kaggle.
       copyBtn.innerHTML = '复制';
-      selectText(codeEl);
-      return toast('部署包暂不可用——请改用「复制小引导格」（零网络即可复制）', 'bad');
+      return toast('完整代码暂时加载不到——可先用上方「复制小引导格」（约 1 KB，零依赖），或刷新页面重试', 'bad');
     }
     const fp = await fingerprint(text);
     const how = await copySmart(text, codeEl);
@@ -242,12 +276,15 @@ export function initSimulator(state) {
   return {
     async refresh() {
       if (!loaded) loadBundle();
-      // the copy target is the source of truth: keep it fresh
-      if (loaded) {
+      // Embedded copies are authoritative; only a GATEWAY-sourced copy is
+      // refreshed, and only ever replaced by another verified-runnable
+      // bundle (a 404 body must never clobber good code).
+      if (loaded && bundleSource === '网关实时版本') {
         try {
           const res = await fetch('/deploy/bundle', { cache: 'no-store' });
+          if (!res.ok) return;
           const txt = await res.text();
-          if (txt && txt !== bundle) {
+          if (looksRunnable(txt) && txt !== bundle) {
             bundle = txt;
             if (codeEl) codeEl.textContent = bundle;
           }

@@ -38,6 +38,17 @@ from pathlib import Path
 # (Kaggle's standard T4x2 image).  Used only when torch must be upgraded.
 FALLBACK_TORCH = "2.6.0"
 
+# The TTS stack combo the upstream authors actually tested (faster-qwen3-tts
+# 0.5.4 wheel metadata + PyPI, read 2026-10).  An unpinned install floats
+# transformers to the newest 5.x, whose MimiConfig no longer exposes
+# rope_theta and crashes qwen-tts-hf at load (see py/compat.py).  These
+# constants are referenced by build_constraints() and install_core(); they
+# were once lost in a rewrite, which made bootstrap step 2 die with
+# "NameError: name 'TRANSFORMERS_PIN' is not defined" on Kaggle.
+TRANSFORMERS_PIN = "5.18.0"
+ACCELERATE_PIN = "1.12.0"
+FASTER_QWEN_PIN = "0.5.4"
+
 # driver CUDA version -> PyTorch wheel index
 CUDA_INDEX = {
     "11.8": "https://download.pytorch.org/whl/cu118",
@@ -261,14 +272,17 @@ def install_core(constraints: Path, log) -> dict:
         log("   librosa missing -> installing the 0.10/0.11 line")
         run_pip(c + ["librosa>=0.10.2,<1.0"])
 
-    # 3) the TTS engine itself
-    rc, out = run_pip(c + ["faster-qwen3-tts"])
+    # 3) the TTS engine itself (pinned: a floating install can pull a
+    #    release whose metadata fights the constraints above)
+    rc, out = run_pip(c + [f"faster-qwen3-tts=={FASTER_QWEN_PIN}"])
     res["steps"].append(("faster-qwen3-tts", rc))
     res["tts_log"] = out[-3000:] if rc != 0 else ""
     if rc != 0:
-        # transformers >= 5.15.1 is required; try an explicit pin
+        # retry with the tested transformers pin spelled out (must match
+        # the constraint, never a second hard-coded version)
         log("   ⚠ faster-qwen3-tts failed; retrying with an explicit transformers pin")
-        rc2, out2 = run_pip(c + ["transformers==5.15.1", "faster-qwen3-tts"])
+        rc2, out2 = run_pip(c + [f"transformers=={TRANSFORMERS_PIN}",
+                                 f"faster-qwen3-tts=={FASTER_QWEN_PIN}"])
         res["steps"].append(("faster-qwen3-tts-pinned", rc2))
         res["tts_log"] = out2[-3000:] if rc2 != 0 else res["tts_log"]
         rc = rc2
