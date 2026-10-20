@@ -252,6 +252,7 @@ def http_json(url: str, timeout=3):
 def wait_ready(n_workers: int, timeout_s: int = 1800) -> bool:
     t_end = time.time() + timeout_s
     last = 0.0
+    seen_tb: set = set()   # worker ids whose traceback we already printed
     while time.time() < t_end:
         try:
             h = http_json(f"http://127.0.0.1:{GATEWAY_PORT}/api/health")

@@ -121,6 +121,21 @@ Kaggle `GPU T4 x2` 上：
   新增 `tools/playout_check.mjs`：抽取真实 worklet 源码以虚拟时钟跑慢启动/突发/敌对断流/短句
   四种到达模式，断言开播后零可闻间隙——四模式 ×3 轮全过（生产端分句与双卡流水线未动）。
 
+## 6.5 Kaggle 真机 NameError 修复（2026-10-20 用户日志）
+- 现象：复制到 Kaggle 运行，bootstrap 第 2/9 步崩 `NameError: TRANSFORMERS_PIN is not defined`
+  （deps.build_constraints）。根因：两个 pin 常量在某次重写中丢失，注释还写着「见上方」；
+  本地 Mock 模式从不调用 build_constraints，所以全套电池一直是绿的——典型的只在真机路径
+  引爆的地雷。同类第二颗：bootstrap.wait_ready 的 `seen_tb` 未初始化（worker 出错时
+  traceback 被 NameError 吞掉）。
+- 修复：deps.py 顶层补回 TRANSFORMERS_PIN=5.18.0 / ACCELERATE_PIN=1.12.0 /
+  FASTER_QWEN_PIN=0.5.4；faster-qwen3-tts 安装与重试都用常量锁定（重试不再硬编码
+  5.15.1，避免与约束文件冲突）；wait_ready 初始化 seen_tb。
+- 上游元数据复核（PyPI 实测）：faster-qwen3-tts 0.5.4 要求 transformers<6,>=5.15.1，
+  qwen-tts-hf 要求 accelerate==1.12.0——与锁定组合完全兼容；pip --dry-run 用真实约束
+  文件解析成功，解析集 = torch 2.10.0 / transformers 5.18.0 / accelerate 1.12.0。
+- 新增永久门禁 `tools/deps_check.py`（已打包）：真跑 build_constraints + 全库 pyflakes
+  未定义名扫描；连跑 3 次 PASS。rope/真机 GPU 项仍以下一节为准。
+
 ## 7. **尚未**在真实 T4×2 上验证（第一次运行必须看的点）
 - ~~faster-qwen3-tts 0.5.4 在 Kaggle 当前 transformers 组合下崩溃~~ **已定版修复（2026-10 真机日志确认）**：
   Kaggle 上 pip 把 transformers 浮动升级到 5.20.1 后，worker 加载即报
