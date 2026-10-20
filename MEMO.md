@@ -121,6 +121,11 @@ Kaggle `GPU T4 x2` 上：
   新增 `tools/playout_check.mjs`：抽取真实 worklet 源码以虚拟时钟跑慢启动/突发/敌对断流/短句
   四种到达模式，断言开播后零可闻间隙——四模式 ×3 轮全过（生产端分句与双卡流水线未动）。
 
+- 紫色主题恢复（2026-10-20）：用户要求回到之前的紫色设计。旧紫色提交未进本仓库历史，
+  故以设计令牌无损换色实现：styles.css 的荧光绿令牌 --acid(#D9FF3F) 整体换成
+  --violet(#A78BFA)/--violet-deep(#7C5CFC)，39 处 var() 引用自动跟色；写死绿一并清除
+  （canvas 波形 app.js、favicon、内联边框、渐变端点）。布局与交互零改动。
+
 ## 6.5 Kaggle 真机 NameError 修复（2026-10-20 用户日志）
 - 现象：复制到 Kaggle 运行，bootstrap 第 2/9 步崩 `NameError: TRANSFORMERS_PIN is not defined`
   （deps.build_constraints）。根因：两个 pin 常量在某次重写中丢失，注释还写着「见上方」；

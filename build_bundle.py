@@ -78,6 +78,7 @@ FILES: list[tuple[str, str, str]] = [
     ("rust/audio_rt/Cargo.toml", "rust/audio_rt/Cargo.toml", "r"),
     ("rust/audio_rt/src/lib.rs", "rust/audio_rt/src/lib.rs", "r"),
     ("tools/chat_check.py", "tools/chat_check.py", "r"),
+    ("tools/deps_check.py", "tools/deps_check.py", "r"),
     ("tools/e2e_check.py", "tools/e2e_check.py", "r"),
     ("tools/rope_compat_check.py", "tools/rope_compat_check.py", "r"),
     ("tools/selftest.py", "tools/selftest.py", "r"),
