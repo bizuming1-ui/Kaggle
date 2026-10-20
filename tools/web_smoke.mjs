@@ -122,6 +122,32 @@ const dom = new JSDOM(html, {
     });
     window.requestAnimationFrame = (cb) => setTimeout(() => cb(Date.now()), 16);
     window.cancelAnimationFrame = (id) => clearTimeout(id);
+    // Fake AudioContext mimicking Chrome's autoplay policy: starts
+    // suspended, resume() only succeeds while __userActivation is set.
+    // Lets the smoke prove the gesture-unlock wiring for streaming audio.
+    window.__userActivation = false;
+    window.AudioWorkletNode = class {
+      constructor() { this.port = { postMessage() {}, onmessage: null }; }
+      connect() {}
+    };
+    window.AudioContext = class {
+      constructor() {
+        this.state = 'suspended';
+        this.sampleRate = 48000;
+        this.currentTime = 0;
+        this.destination = {};
+        this.onstatechange = null;
+        this.audioWorklet = { addModule: async () => {} };
+      }
+      async resume() {
+        if (window.__userActivation) {
+          this.state = 'running';
+          if (this.onstatechange) this.onstatechange();
+        }
+      }
+      createBufferSource() { return { connect() {}, start() {} }; }
+      async decodeAudioData() { return { duration: 0.1 }; }
+    };
     window.navigator.clipboard = { writeText: async () => {} };
     // jsdom has no clipboard bridge: simulate execCommand('copy') faithfully by
     // capturing the selected readonly textarea the copy helper creates.
@@ -176,6 +202,17 @@ must(doc.querySelector('#stModel')?.textContent === 'deepseek-flash', 'LLM model
 must(doc.querySelector('#profList')?.children.length >= (SIMPAGE ? 2 : 1), 'the profile list must render');
 must(SIMPAGE ? !!doc.querySelector('.simchip') : !doc.querySelector('.simchip'),
   SIMPAGE ? 'the simulator chip must be present in sim mode' : 'no simulator chip on the real site');
+
+// autoplay unlock: playback context must be suspended at boot and a real
+// gesture must flip it to running (else streaming replies are silent or
+// stall). We observe the app's own qtts-player-state events.
+const playerStates = [];
+doc.addEventListener('qtts-player-state', (e) => playerStates.push(e.detail));
+w.__userActivation = true;
+doc.dispatchEvent(new w.Event('pointerdown', { bubbles: true }));
+await new Promise((r) => setTimeout(r, 150));
+must(playerStates.includes('running'),
+  'a user gesture must unlock the playback context: ' + playerStates.join(','));
 
 // tab switching
 doc.querySelector('[data-tab="chat"]').dispatchEvent(new w.Event('click', { bubbles: true }));

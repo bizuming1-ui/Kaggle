@@ -121,6 +121,12 @@ export function initChat(state) {
     if (ui.busy) { await bargeIn(' new turn'); }
     ui.busy = true;
     const player = state.player;
+    // Autoplay policy: sending (click / Enter / mic) is a user gesture —
+    // unlock playback inside it, drop any stale buffered audio, then open.
+    // The player pre-rolls a ~1 s cushion, so generation and playback
+    // overlap continuously instead of stalling after the first chunk.
+    await player.unlock();
+    player.reset();
     player.open();
     ui.assistantTalking = true;
     const bubble = addMsg('bot', '', { streaming: true });
@@ -243,6 +249,7 @@ export function initChat(state) {
   async function toggleMic() {
     if (!ui.listening) {
       try {
+        state.player?.unlock();   // the mic gesture also unlocks playback
         await mic.start();
         ui.listening = true;
         $('#btnMic').dataset.rec = '1';

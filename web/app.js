@@ -453,8 +453,13 @@ async function boot() {
 
   state.player = new QTTSPlayer({
     onUnderrun: () => { const e = $('#stUnder'); if (e) e.textContent = String(++chatState.underruns); },
+    onStateChange: (st) => document.dispatchEvent(new CustomEvent('qtts-player-state', { detail: st })),
   });
   try { await state.player.init(); } catch (e) { console.warn('audio init failed', e); }
+  // First real gesture anywhere unlocks playback (autoplay policy); after
+  // that, replies stream audibly on their own, ChatGPT-style.
+  document.addEventListener('pointerdown', () => state.player?.unlock(), { capture: true });
+  document.addEventListener('keydown', () => state.player?.unlock(), { capture: true });
 
   step('status', async () => {
     await pollStatus();
