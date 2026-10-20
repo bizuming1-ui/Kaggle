@@ -107,6 +107,12 @@ Kaggle `GPU T4 x2` 上：
   （Kaggle 报错实证，IPython 对未闭合字符串报 "incomplete input"）。已双重加固：
   ① HEADER 改纯 `#` 注释（无可被截断破坏的字符串结构）；② 语法/魔法字符门禁固化进 `build_bundle.py --check`；
   ③ 前端复制按钮强制拉取最新 + 指纹校验（杜绝页面旧缓存）；④ Launchpad 提供 1 KB 小引导格（多镜像下载+执行，抗粘贴截断）。
+- 完整代码复制不了修复（本轮）：静态预览/后端未起时 Launchpad 只请求 `/deploy/bundle` → 404，
+  代码框只剩占位文字且复制失败还会选中它。修复：`build_bundle.py` 生成页面内置模块
+  `web/bundle-inline.js`（完整 yuyinkelong，不进 FILES 防自引用），取包改三级链——内置模块 →
+  同目录 sim-bundle.txt → 网关（Kaggle 上前两者缺失自动落回已验证的网关路径）；顺带修复
+  refresh() 用 404 响应文本覆盖已加载好代码的隐藏雷。smoke 站点模式将两条 fetch 路径 404 化，
+  并给 VM 补上动态 import（link+evaluate），内置路径从此被真测覆盖。
 - 开头播放停顿修复（本轮）：根因是浏览器 worklet 首包到达即开播、零缓冲——第一段 ~250ms 音频
   播完时下一块还在合成，必然停顿零点几秒。worklet 改为预填充状态机：攒够 1.0s（或首包等待
   900ms、或流结束）才开播；中途断流先给 120ms 宽限（吸收结束帧竞态），真断流只报一次

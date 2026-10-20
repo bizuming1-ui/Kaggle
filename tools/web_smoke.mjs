@@ -84,6 +84,13 @@ const dom = new JSDOM(html, {
           }],
         });
       }
+      if ((u.startsWith('/deploy/bundle') || u.endsWith('sim-bundle.txt')) && !SIMPAGE) {
+        // Site page WITHOUT a gateway (static preview / backend down), as
+        // in the reported screenshot: the bundle must come from the
+        // embedded bundle-inline.js module — no fetch path may rescue it
+        // here, or the test would mask the bug again.
+        return new Response('not found', { status: 404 });
+      }
       if (u.startsWith('/deploy/bundle') || u.endsWith('sim-bundle.txt') || u.endsWith('/yuyinkelong')) {
         // the stub gateway serves the REAL deploy bundle, exactly like production
         return new Response(readFileSync(path.resolve(HERE, '..', 'yuyinkelong'), 'utf8'), {
@@ -171,10 +178,22 @@ w.addEventListener('unhandledrejection', (e) => errors.push('unhandledrejection:
 // real ES modules inside the jsdom realm with vm.SourceTextModule.
 const ctx = dom.getInternalVMContext();
 const cache = new Map();
+async function dynImport(spec) {
+  // Real dynamic import() support so the simulator's embedded-bundle
+  // path (import('./bundle-inline.js')) is exercised as in a browser.
+  const m = getModule(spec.replace(/^\.\//, ''));
+  if (m.status === 'unlinked') {
+    await m.link((s) => getModule(s.replace(/^\.\//, '')));
+  }
+  if (m.status === 'linked') await m.evaluate();
+  return m;
+}
 function getModule(file) {
   if (cache.has(file)) return cache.get(file);
   const src = readFileSync(path.join(WEB, file), 'utf8');
-  const m = new vm.SourceTextModule(src, { context: ctx, identifier: file });
+  const m = new vm.SourceTextModule(src, {
+    context: ctx, identifier: file, importModuleDynamically: dynImport,
+  });
   cache.set(file, m);
   return m;
 }
@@ -228,6 +247,8 @@ must(doc.querySelector('#panel-sim')?.hasAttribute('data-active'), 'sim panel mu
 await new Promise((r) => setTimeout(r, 500));
 must(doc.querySelector('#simCode')?.textContent?.includes('QTTS BUNDLE START'), 'the real bundle must be loaded');
 must(doc.querySelector('#simLen')?.textContent?.includes('✓ 可直接运行'), 'the bundle must be flagged runnable');
+must(doc.querySelector('#simLen')?.textContent?.includes('已内置于页面'),
+  'the bundle must come from the embedded copy (works with no gateway): ' + doc.querySelector('#simLen')?.textContent);
 must(doc.querySelector('#simLen')?.textContent?.includes('文件'), 'the bundle stats must be rendered');
 
 // the copy button must actually copy the real, runnable yuyinkelong bundle
