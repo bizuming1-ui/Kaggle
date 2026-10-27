@@ -229,7 +229,7 @@
 
         <section class="view" id="view-simulation" data-title="硬件仿真">
           <div class="section-heading">
-            <div><p class="eyebrow"><span></span> HARDWARE SIMULATION</p><h1>硬件仿真</h1><p>独立 8 MHz HEX 已用真实 Thumb 指令验证扫描与按键，可下载到 Proteus 做 A/B 测试；浏览器实时内核仍未配置。</p></div>
+            <div><p class="eyebrow"><span></span> HARDWARE SIMULATION</p><h1>硬件仿真</h1><p>最新独立 8 MHz HEX 已按照片的 GND 按键完成真实 Thumb 指令验证；点阵请先用 MATRIX-8X8-RED 做 3.3 V 直驱测试。</p></div>
             <a class="button button--light" href="/firmware.hex" download="stm32f103-matrix-8mhz.hex"><svg><use href="#i-download"/></svg>下载已验证 HEX</a>
           </div>
           <div class="honesty-notice"><svg><use href="#i-info"/></svg><div><strong>离线 ARM 验证通过，不等于 Proteus 已通过</strong><p>已实际执行当前五个业务 .c 生成的 Cortex-M3 代码，并核对 GPIOB 扫描、PA4/PA5/PA6 和 SysTick 参数。此页不显示虚构的实时运行结果；LED 压降、电流、Program File 与你的原理图仍需在 Proteus 中验证。</p></div></div>

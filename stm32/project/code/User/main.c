@@ -10,9 +10,10 @@
  *   MCU:                        PB8 PB9 PB10 PB11 PB12 PB13 PB14 PB15
  *   Put one series resistor (for example 220 ohm in simulation) in each R line.
  *
- *   PA4 <- UP button,     other button terminal -> 3.3 V
- *   PA5 <- DOWN button,   other button terminal -> 3.3 V
- *   PA6 <- STOP button,   other button terminal -> 3.3 V
+ *   PA4 <- UP button,     other button terminal -> GND (as in the photo)
+ *   PA5 <- DOWN button,   other button terminal -> GND (as in the photo)
+ *   PA6 <- STOP button,   other button terminal -> GND (as in the photo)
+ *   Released inputs use internal pull-ups; pressed inputs are active LOW.
  *   PA7 is deliberately unused because no fourth-button function was specified.
  *
  * IMPORTANT:

@@ -18,6 +18,9 @@ static void reset_firmware(void)
 {
     memset(&mock_gpioa, 0, sizeof(mock_gpioa));
     memset(&mock_gpiob, 0, sizeof(mock_gpiob));
+    /* The photographed buttons connect to GND. Model released contacts as
+       HIGH, as established by the firmware's internal pull-ups. */
+    mock_gpioa.IDR = GPIO_Pin_4 | GPIO_Pin_5 | GPIO_Pin_6 | GPIO_Pin_7;
     App_Init();
 }
 
@@ -35,13 +38,13 @@ static void set_pin(uint16_t pin, int high)
 
 static void press_debounced(uint16_t pin)
 {
-    set_pin(pin, 1);
+    set_pin(pin, 0);              /* active LOW: contact connects to GND */
     ticks(BUTTON_DEBOUNCE_MS);
 }
 
 static void release_debounced(uint16_t pin)
 {
-    set_pin(pin, 0);
+    set_pin(pin, 1);              /* released: internal pull-up drives HIGH */
     ticks(BUTTON_DEBOUNCE_MS);
 }
 
@@ -50,6 +53,8 @@ static void test_scan_and_idle_polarity(void)
     uint8_t column;
     reset_firmware();
     assert(mock_gpiob.ODR == 0x0000FF00UL);
+    assert((mock_gpioa.ODR & 0x00F0UL) == 0x00F0UL); /* pull-ups selected */
+    assert((mock_gpioa.CRL & 0xFFFF0000UL) == 0x88880000UL);
     assert(App_GetDigit() == 1U);
     assert(App_GetMode() == APP_PAUSED);
 
@@ -63,24 +68,26 @@ static void test_scan_and_idle_polarity(void)
             assert(((mock_gpiob.ODR >> 8) & 0xFFU) == 0xFFU);
         }
     }
+    assert(App_GetDigit() == 1U);       /* released HIGH inputs create no event */
+    assert(App_GetMode() == APP_PAUSED);
 }
 
 static void test_immediate_up_and_stop_before_next_step(void)
 {
     reset_firmware();
-    set_pin(GPIO_Pin_4, 1);
+    set_pin(GPIO_Pin_4, 0);       /* press PA4 to GND */
     ticks(BUTTON_DEBOUNCE_MS - 1U);
     assert(App_GetMode() == APP_PAUSED);
     assert(App_GetDigit() == 1U);
 
-    ticks(1U);                    /* debounced momentary rising edge */
+    ticks(1U);                    /* debounced momentary HIGH -> LOW edge */
     assert(App_GetMode() == APP_COUNTING_UP);
     assert(App_GetDigit() == 2U); /* immediate first step, not +500 ms */
     assert(App_GetElapsedMs() == 0U);
 
     ticks(APP_STEP_TIME_MS - 1U);
     assert(App_GetDigit() == 2U);
-    set_pin(GPIO_Pin_6, 1);       /* raw STOP has priority on this very tick */
+    set_pin(GPIO_Pin_6, 0);       /* raw STOP has priority on this very tick */
     ticks(1U);
     assert(App_GetMode() == APP_PAUSED);
     assert(App_GetDigit() == 2U); /* no unintended increment to 3 */
@@ -88,7 +95,7 @@ static void test_immediate_up_and_stop_before_next_step(void)
     ticks(1000U);
     assert(App_GetDigit() == 2U);
 
-    set_pin(GPIO_Pin_6, 0);
+    set_pin(GPIO_Pin_6, 1);
     release_debounced(GPIO_Pin_4);
     assert(App_GetMode() == APP_PAUSED);
 }
@@ -150,30 +157,30 @@ static void test_momentary_release_does_not_cancel_counting(void)
 
     ticks(APP_STEP_TIME_MS - BUTTON_DEBOUNCE_MS);
     assert(App_GetDigit() == 3U);
-    set_pin(GPIO_Pin_6, 1);
+    set_pin(GPIO_Pin_6, 0);
     ticks(1U);
     assert(App_GetMode() == APP_PAUSED);
     assert(App_GetDigit() == 3U);
-    set_pin(GPIO_Pin_6, 0);
+    set_pin(GPIO_Pin_6, 1);
 }
 
 static void test_pause_resume_and_pa7_is_unused(void)
 {
     reset_firmware();
-    set_pin(GPIO_Pin_7, 1);
+    set_pin(GPIO_Pin_7, 0);
     ticks(1000U);
     assert(App_GetDigit() == 1U);
     assert(App_GetMode() == APP_PAUSED);
-    set_pin(GPIO_Pin_7, 0);
+    set_pin(GPIO_Pin_7, 1);
 
     press_debounced(GPIO_Pin_4);
     assert(App_GetDigit() == 2U);
     ticks(250U);
-    set_pin(GPIO_Pin_6, 1);
+    set_pin(GPIO_Pin_6, 0);
     ticks(1U);
     assert(App_GetDigit() == 2U);
     assert(App_GetMode() == APP_PAUSED);
-    set_pin(GPIO_Pin_6, 0);
+    set_pin(GPIO_Pin_6, 1);
     release_debounced(GPIO_Pin_4);
     ticks(1000U);
     assert(App_GetDigit() == 2U); /* releasing STOP never auto-resumes */
@@ -193,6 +200,6 @@ int main(void)
     test_full_up_and_down_ranges();
     test_momentary_release_does_not_cancel_counting();
     test_pause_resume_and_pa7_is_unused();
-    puts("firmware logic: PASS (scan, polarity, immediate momentary steps, release, stop, 1..9 saturation, PA7 unused)");
+    puts("firmware logic: PASS (scan, GND active-LOW pull-ups, immediate steps, release, stop, 1..9 saturation, PA7 unused)");
     return 0;
 }
