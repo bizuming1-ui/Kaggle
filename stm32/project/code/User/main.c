@@ -8,8 +8,9 @@
  *   Matrix bottom R1..R8 <- PB8..PB15   (row cathodes, LOW lights)
  *   PA4 UP, PA5 DOWN, PA6 STOP: other contact terminal -> GND.
  *   Released keys use internal pull-ups; pressed keys are LOW.
- *   Boot shows 8 for 512 ms as a build marker, then shows 1 and pauses.
- *   First LOW sample steps immediately; 20 ms HIGH releases/re-arms.
+ *   Boot shows 1 and waits; PA4 counts 1..8, PA5 counts 8..1.
+ *   A short press steps immediately, then continues every 500 ms.
+ *   PA6 stops at the current digit; 20 ms HIGH releases/re-arms direction keys.
  *   PA7 is deliberately unused.
  *
  * Copy only User/main.c and User/stm32f10x_it.c/.h.
@@ -21,11 +22,9 @@
 /* All configuration and types live here too: no custom header is required. */
 #define FW_STEP_TIME_MS       500U
 #define FW_RELEASE_MS         20U
-#define FW_STARTUP_SIGNATURE_MS 512U  /* show 8 briefly, then normal digit 1 */
-#define FW_STARTUP_SIGNATURE_DIGIT 8U
 #define FW_INITIAL_DIGIT      1U
 #define FW_MIN_DIGIT          1U
-#define FW_MAX_DIGIT          9U
+#define FW_MAX_DIGIT          8U
 
 typedef enum
 {
@@ -42,7 +41,7 @@ typedef enum
 #define FW_EVENT_DOWN         (0x02U)
 
 /* Bit 0 is R1 (top), bit 7 is R8 (bottom), one byte per column. */
-static const uint8_t s_digitColumns[9][8] =
+static const uint8_t s_digitColumns[8][8] =
 {
     { 0x00, 0x00, 0x40, 0x42, 0x7F, 0x40, 0x40, 0x00 }, /* 1 */
     { 0x00, 0x42, 0x61, 0x51, 0x49, 0x46, 0x00, 0x00 }, /* 2 */
@@ -51,8 +50,7 @@ static const uint8_t s_digitColumns[9][8] =
     { 0x00, 0x4F, 0x49, 0x49, 0x49, 0x31, 0x00, 0x00 }, /* 5 */
     { 0x00, 0x3E, 0x49, 0x49, 0x49, 0x30, 0x00, 0x00 }, /* 6 */
     { 0x00, 0x01, 0x01, 0x71, 0x0D, 0x03, 0x00, 0x00 }, /* 7 */
-    { 0x00, 0x36, 0x49, 0x49, 0x49, 0x36, 0x00, 0x00 }, /* 8 */
-    { 0x00, 0x06, 0x49, 0x49, 0x49, 0x3E, 0x00, 0x00 }  /* 9 */
+    { 0x00, 0x36, 0x49, 0x49, 0x49, 0x36, 0x00, 0x00 }  /* 8 */
 };
 
 typedef struct
@@ -73,7 +71,6 @@ static uint8_t s_scanColumn;
 static uint8_t s_digit;
 static FirmwareMode s_mode;
 static uint32_t s_elapsedMs;
-static uint16_t s_startupMs;
 
 static void Board_ClockAndDebugInit(void)
 {
@@ -130,12 +127,14 @@ static void Firmware_ConfigPullUp(uint8_t pin)
 
 static void Firmware_ButtonsInit(void)
 {
-    GPIOA->ODR |= (uint32_t)(FW_UP_PIN | FW_DOWN_PIN |
-                              FW_STOP_PIN | FW_UNUSED_PIN);
     Firmware_ConfigPullUp(4U);
     Firmware_ConfigPullUp(5U);
     Firmware_ConfigPullUp(6U);
     Firmware_ConfigPullUp(7U);  /* safe idle, intentionally no action */
+
+    /* Select pull-ups only after all four input-mode nibbles are final. */
+    GPIOA->ODR |= (uint32_t)(FW_UP_PIN | FW_DOWN_PIN |
+                              FW_STOP_PIN | FW_UNUSED_PIN);
 
     s_directionButtons[0].pressedLatch = 0U;
     s_directionButtons[0].releaseMs = 0U;
@@ -264,12 +263,10 @@ void Firmware_Init(void)
     Firmware_MatrixGpioInit();
     Firmware_ButtonsInit();
 
-    /* Unambiguous build marker: new firmware shows 8 for about half a second.
-       If Proteus never shows 8, it is not running this newly built image. */
-    s_digit = FW_STARTUP_SIGNATURE_DIGIT;
+    /* No boot animation and no input-blocking window: ready from the first tick. */
+    s_digit = FW_INITIAL_DIGIT;
     s_mode = FW_PAUSED;
     s_elapsedMs = 0U;
-    s_startupMs = FW_STARTUP_SIGNATURE_MS;
     Firmware_MatrixSetDigit(s_digit);
 }
 
@@ -278,18 +275,6 @@ void Firmware_Task1ms(void)
     uint8_t events;
 
     Firmware_MatrixScan();
-
-    if (s_startupMs != 0U)
-    {
-        --s_startupMs;
-        if (s_startupMs == 0U)
-        {
-            s_digit = FW_INITIAL_DIGIT;
-            Firmware_MatrixSetDigit(s_digit);
-        }
-        return;
-    }
-
     events = Firmware_ButtonEvents();
 
     /* STOP has priority over every direction event and pending auto step. */

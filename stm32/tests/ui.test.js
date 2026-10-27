@@ -74,10 +74,12 @@ test('real DOM workflow: select -> not persisted -> click save -> persisted -> e
   assert.ok(firmwareLink, 'hardware view exposes the verified Proteus HEX');
   assert.equal(firmwareLink.getAttribute('download'), 'stm32f103-matrix-8mhz.hex');
   assert.match(firmwareLink.textContent, /下载已验证 HEX/);
-  const buildMarker = window.document.querySelector('#buildMarkerNotice');
-  assert.ok(buildMarker, 'hardware view explains the visible new-firmware marker');
-  assert.match(buildMarker.textContent, /8 → 1/);
-  assert.match(buildMarker.textContent, /PA4 应立即变成 2/);
+  const behaviorNotice = window.document.querySelector('#firmwareBehaviorNotice');
+  assert.ok(behaviorNotice, 'hardware view explains the exact 1..8 button behavior');
+  assert.match(behaviorNotice.textContent, /PA4 升到 8/);
+  assert.match(behaviorNotice.textContent, /PA5 降到 1/);
+  assert.match(behaviorNotice.textContent, /PA6 暂停/);
+  assert.match(behaviorNotice.textContent, /立即看到 2/);
 
   const source = '#include "stm32f10x.h"\r\n// 浏览器按钮真实保存测试\r\nint main(void) { return 0; }\r\n';
   await window.eval(`stageEntries([{ file: new File([${JSON.stringify(source)}], 'main.c', { type: 'text/plain' }), relativePath: 'main.c' }])`);

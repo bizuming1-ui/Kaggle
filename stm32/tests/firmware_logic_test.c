@@ -36,8 +36,7 @@ static void ticks(uint32_t count)
 
 static void reset_firmware(void)
 {
-    reset_hardware();
-    ticks(FW_STARTUP_SIGNATURE_MS);  /* enter the normal 1 + paused state */
+    reset_hardware();  /* no boot delay: normal 1 + paused state immediately */
 }
 
 static void set_pin(uint16_t pin, int high)
@@ -58,21 +57,20 @@ static void release_debounced(uint16_t pin)
     ticks(FW_RELEASE_MS);
 }
 
-static void test_startup_signature(void)
+static void test_ready_from_first_tick_without_boot_animation(void)
 {
     reset_hardware();
     assert(mock_gpiob.ODR == 0x0000FF00UL); /* no column selected before 1 ms task */
-    assert(Firmware_GetDigit() == FW_STARTUP_SIGNATURE_DIGIT);
+    assert(Firmware_GetDigit() == 1U);       /* new build boots directly to 1, not 8 */
     assert(Firmware_GetMode() == FW_PAUSED);
     set_pin(GPIO_Pin_4, 0);
-    ticks(1U);                       /* boot marker deliberately ignores keys */
-    assert(Firmware_GetDigit() == FW_STARTUP_SIGNATURE_DIGIT);
-    assert(Firmware_GetMode() == FW_PAUSED);
-    set_pin(GPIO_Pin_4, 1);
-    ticks(FW_STARTUP_SIGNATURE_MS - 2U);
-    assert(Firmware_GetDigit() == FW_STARTUP_SIGNATURE_DIGIT);
-    ticks(1U);
-    assert(Firmware_GetDigit() == FW_INITIAL_DIGIT);
+    ticks(1U);                              /* no input-blocking startup window */
+    assert(Firmware_GetDigit() == 2U);
+    assert(Firmware_GetMode() == FW_COUNTING_UP);
+
+    reset_hardware();
+    ticks(512U);                            /* remains ready; never inserts an 8 */
+    assert(Firmware_GetDigit() == 1U);
     assert(Firmware_GetMode() == FW_PAUSED);
     assert(Firmware_GetElapsedMs() == 0U);
 }
@@ -165,35 +163,41 @@ static void test_full_up_and_down_ranges(void)
     uint8_t expected;
     reset_firmware();
 
+    /* One momentary PA4 press, released immediately: 1 -> 2 -> ... -> 8. */
     press_immediate(GPIO_Pin_4);
-    assert(Firmware_GetDigit() == 2U); /* immediate 1 -> 2 */
-    for (expected = 3U; expected <= 9U; ++expected)
+    assert(Firmware_GetDigit() == 2U);
+    release_debounced(GPIO_Pin_4);
+    ticks(FW_STEP_TIME_MS - FW_RELEASE_MS);
+    assert(Firmware_GetDigit() == 3U); /* 500 ms after the immediate first step */
+    for (expected = 4U; expected <= 8U; ++expected)
     {
         ticks(FW_STEP_TIME_MS);
         assert(Firmware_GetDigit() == expected);
     }
     assert(Firmware_GetMode() == FW_PAUSED);
     ticks(2000U);
-    assert(Firmware_GetDigit() == 9U); /* saturated, never wraps to 0/1 */
-    release_debounced(GPIO_Pin_4);
+    assert(Firmware_GetDigit() == 8U); /* saturated, never displays 9 or wraps */
 
-    /* A new UP command at the upper boundary stays at 9. */
+    /* A new UP command at the upper boundary stays at 8. */
     press_immediate(GPIO_Pin_4);
-    assert(Firmware_GetDigit() == 9U);
+    assert(Firmware_GetDigit() == 8U);
     assert(Firmware_GetMode() == FW_PAUSED);
     release_debounced(GPIO_Pin_4);
 
+    /* One momentary PA5 press, released immediately: 8 -> 7 -> ... -> 1. */
     press_immediate(GPIO_Pin_5);
-    assert(Firmware_GetDigit() == 8U); /* immediate 9 -> 8 */
-    for (expected = 7U; expected >= 1U; --expected)
+    assert(Firmware_GetDigit() == 7U);
+    release_debounced(GPIO_Pin_5);
+    ticks(FW_STEP_TIME_MS - FW_RELEASE_MS);
+    assert(Firmware_GetDigit() == 6U);
+    for (expected = 5U; expected >= 1U; --expected)
     {
         ticks(FW_STEP_TIME_MS);
         assert(Firmware_GetDigit() == expected);
     }
     assert(Firmware_GetMode() == FW_PAUSED);
     ticks(2000U);
-    assert(Firmware_GetDigit() == 1U); /* saturated, never wraps to 9 */
-    release_debounced(GPIO_Pin_5);
+    assert(Firmware_GetDigit() == 1U); /* saturated, never wraps to 8 */
 
     /* A new DOWN command at the lower boundary stays at 1. */
     press_immediate(GPIO_Pin_5);
@@ -255,13 +259,13 @@ static void test_pause_resume_and_pa7_is_unused(void)
 
 int main(void)
 {
-    test_startup_signature();
+    test_ready_from_first_tick_without_boot_animation();
     test_scan_and_idle_polarity();
     test_immediate_up_and_stop_before_next_step();
     test_short_tap_bounce_and_rearm();
     test_full_up_and_down_ranges();
     test_momentary_release_does_not_cancel_counting();
     test_pause_resume_and_pa7_is_unused();
-    puts("firmware logic: PASS (8->1 boot marker, scan, 1 ms active-LOW steps, press latch, 20 ms release re-arm, stop, 1..9 saturation, PA7 unused)");
+    puts("firmware logic: PASS (direct 1 boot, immediate PA4/PA5, complete momentary 1..8/8..1 timelines, 500 ms steps, 20 ms release re-arm, PA6 stop, PA7 unused)");
     return 0;
 }
