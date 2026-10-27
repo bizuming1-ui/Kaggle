@@ -47,6 +47,14 @@ test('real DOM workflow: select -> not persisted -> click save -> persisted -> e
   window.Blob = Blob;
   window.URL.createObjectURL = URL.createObjectURL;
   window.URL.revokeObjectURL = URL.revokeObjectURL;
+  window.document.execCommand = (command) => {
+    if (command !== 'copy') return false;
+    const helpers = [...window.document.querySelectorAll('textarea[readonly]')];
+    const helper = helpers.at(-1);
+    if (!helper) return false;
+    window.__copiedCode = helper.value;
+    return true;
+  };
 
   t.after(async () => {
     window.close();
@@ -84,6 +92,8 @@ test('real DOM workflow: select -> not persisted -> click save -> persisted -> e
   await window.eval('openCode("code/main.c")');
   assert.equal(window.document.querySelector('#editorWorkspace').hidden, false);
   assert.match(window.document.querySelector('#codeEditor').value, /真实保存测试/);
+  window.document.querySelector('#copyCurrent').click();
+  assert.match(window.__copiedCode, /int main\(void\)/, 'copy button copies the actual editor content for Keil');
   const editor = window.document.querySelector('#codeEditor');
   editor.value = editor.value.replace('return 0', 'return 42');
   editor.dispatchEvent(new window.Event('input', { bubbles: true }));

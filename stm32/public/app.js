@@ -590,6 +590,41 @@ function downloadKey(key) {
   if (staged && !staged.objectUrl) setTimeout(() => URL.revokeObjectURL(anchor.href), 1000);
 }
 
+async function copyCurrentCode() {
+  if (!state.currentKey) return;
+  const editor = $('#codeEditor');
+  const text = editor.value;
+  let copied = false;
+
+  /* execCommand is attempted inside the click gesture because embedded
+     previews can reject the modern asynchronous clipboard permission. */
+  try {
+    const helper = document.createElement('textarea');
+    helper.value = text;
+    helper.setAttribute('readonly', '');
+    helper.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    document.body.append(helper);
+    helper.select();
+    copied = document.execCommand('copy');
+    helper.remove();
+  } catch { /* Try the modern API below. */ }
+
+  if (!copied) {
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+    } catch { /* A visible selection is the honest final fallback. */ }
+  }
+
+  if (copied) {
+    toast('代码已复制', `${baseName(state.currentKey)} 已复制，可直接粘贴到 Keil µVision5。`, 'success');
+  } else {
+    editor.focus();
+    editor.select();
+    toast('浏览器限制了剪贴板', '已为你选中全部代码，请按 Ctrl+C（Mac：⌘C）复制。', 'info', 8000);
+  }
+}
+
 function saveTasksForAll() {
   const tasks = [...state.staged.keys()].map((key) => ({ key, staged: true }));
   for (const key of state.drafts.keys()) if (!state.staged.has(key)) tasks.push({ key, staged: false });
@@ -800,6 +835,7 @@ function bindEvents() {
   });
   $('#closeEditor').addEventListener('click', closeEditor);
   $('#downloadCurrent').addEventListener('click', () => { if (state.currentKey) downloadKey(state.currentKey); });
+  $('#copyCurrent').addEventListener('click', copyCurrentCode);
   $('#refreshFiles').addEventListener('click', async () => {
     try {
       await loadFiles(true);

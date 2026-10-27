@@ -2,6 +2,16 @@
 
 面向 **STM32F103C8T6 / Keil MDK µVision5** 的独立工作区。当前版本聚焦可验证的素材导入、源码编辑、视频预览与**真实项目落盘**；不会把浏览器内存、`localStorage` 或 IndexedDB 冒充项目保存。
 
+## Proteus 8 × 8×8 点阵固件
+
+`stm32/project/code/` 现已包含一套可在工作台直接复制的 STM32F103C8T6 固件：`main.c`、`app.c/.h`、`matrix.c/.h`、`buttons.c/.h`。实现 PA4 递增到 9、PA5 递减到 1、PA6 立即停止，以及 Proteus 默认列阳极/行阴极点阵的 8 列动态扫描。
+
+精确接线、Keil 工程集成、重复 `SysTick_Handler` 处理与验证边界见 [`PROTEUS_8X8_GUIDE.md`](./PROTEUS_8X8_GUIDE.md)。
+
+```bash
+npm run stm32:firmware-test
+```
+
 ## 启动
 
 在仓库根目录执行：
