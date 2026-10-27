@@ -12,12 +12,9 @@ INCLUDES=(
   -I"$ROOT/stm32/project/code/User"
 )
 
-# Test the exact self-contained main.c, with only its entry point renamed so
-# the host test can supply its own main(). No legacy Hardware module is linked.
-"$CC" "${CFLAGS[@]}" "${INCLUDES[@]}" -Dmain=Firmware_MainForTest \
-  -c "$ROOT/stm32/project/code/User/main.c" -o "$BUILD/main_testable.o"
+# firmware_logic_test.c includes the exact self-contained main.c and renames
+# only its entry point. No production API header or legacy module is needed.
 "$CC" "${CFLAGS[@]}" "${INCLUDES[@]}" \
-  "$BUILD/main_testable.o" \
   "$ROOT/stm32/project/code/User/stm32f10x_it.c" \
   "$ROOT/stm32/tests/firmware_logic_test.c" -o "$BUILD/firmware_logic_test"
 "$BUILD/firmware_logic_test"

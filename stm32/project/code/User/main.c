@@ -11,12 +11,25 @@
  *   First LOW sample steps immediately; 20 ms HIGH releases/re-arms.
  *   PA7 is deliberately unused.
  *
- * Copy only User/main.c, User/matrix_firmware.h and User/stm32f10x_it.c/.h.
+ * Copy only User/main.c and User/stm32f10x_it.c/.h.
  * Remove legacy Hardware app/buttons/matrix sources from the Keil Target.
  */
 #include "stm32f10x.h"
-#include "matrix_firmware.h"
 #include "stm32f10x_it.h"
+
+/* All configuration and types live here too: no custom header is required. */
+#define FW_STEP_TIME_MS       500U
+#define FW_RELEASE_MS         20U
+#define FW_INITIAL_DIGIT      1U
+#define FW_MIN_DIGIT          1U
+#define FW_MAX_DIGIT          9U
+
+typedef enum
+{
+    FW_PAUSED = 0,
+    FW_COUNTING_UP,
+    FW_COUNTING_DOWN
+} FirmwareMode;
 
 #define FW_UP_PIN             (0x0010U)   /* PA4 */
 #define FW_DOWN_PIN           (0x0020U)   /* PA5 */

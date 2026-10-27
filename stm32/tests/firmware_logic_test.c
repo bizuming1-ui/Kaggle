@@ -1,8 +1,12 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include "matrix_firmware.h"
-#include "stm32f10x.h"
+
+/* Include the exact delivered implementation so this test needs no copied
+   production API header. Only the entry symbol is renamed for the host. */
+#define main Firmware_MainForTest
+#include "../project/code/User/main.c"
+#undef main
 
 GPIO_TypeDef mock_gpioa;
 GPIO_TypeDef mock_gpiob;

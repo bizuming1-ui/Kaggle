@@ -4,7 +4,7 @@
 
 ## Proteus 8 × 8×8 点阵固件
 
-`stm32/project/code/` 现在只保留 4 个交付文件：`User/main.c`、`User/matrix_firmware.h`、`User/stm32f10x_it.c/.h`。为避免 Keil 继续链接旧 Hardware 对象，点阵、按键和计数已全部收进自包含 `main.c`；它不再包含 `app.h`，也不调用旧 `App_*`、`Buttons_*` 或 `Matrix_*` 外部函数。
+`stm32/project/code/` 现在只保留 3 个交付文件：`User/main.c`、`User/stm32f10x_it.c/.h`。点阵、按键、计数、常量和类型全部收进自包含 `main.c`，不再需要 `matrix_firmware.h`，因此不会再出现漏复制该头文件导致的 ARMCC #5 错误。主程序也不调用旧 `App_*`、`Buttons_*` 或 `Matrix_*` 外部函数。
 
 PA4/PA5/PA6 按照片配置为**内部上拉、接 GND 时按下**。第一个低电平采样立即递增/递减并锁存，20 ms 只用于松开重新武装；随后每 500 ms 自动步进到 9/1，PA6 拉低立即暂停，PA7 无功能。点阵保持已能显示 1 的 `MATRIX-8X8-RED` 和 8 列动态扫描。工程只有唯一的 `SysTick_Handler` 和 `system_tick` 定义。
 

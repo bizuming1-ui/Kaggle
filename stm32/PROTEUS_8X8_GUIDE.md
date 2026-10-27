@@ -1,17 +1,18 @@
 # Proteus 8：STM32F103C8T6 驱动 16 引脚 8×8 点阵
 
-## 0. 本版为什么改成 4 文件自包含固件
+## 0. 本版为什么改成 3 文件自包含固件
 
 多轮修改后，浏览器源码和真实 ARM 仿真均能响应按键，但用户的 Keil/Proteus 仍始终显示 1。继续改消抖无法排除 Keil 仍链接旧 `app.o/buttons.o/matrix.o` 的风险。
 
-本版因此只交付以下 4 个文件：
+本版因此只交付以下 3 个文件：
 
 ```text
 User/main.c
-User/matrix_firmware.h
 User/stm32f10x_it.c
 User/stm32f10x_it.h
 ```
+
+`matrix_firmware.h` 的常量和类型已全部并入 `main.c`，该头文件已删除。这样同时解决 ARMCC `cannot open source input file "matrix_firmware.h"` 的漏文件问题。
 
 点阵、按键和计数全部在 `main.c` 内实现，不再包含 `app.h`，也不再调用旧 `App_*`、`Buttons_*` 或 `Matrix_*` 外部函数。浏览器中的 6 个旧 Hardware 文件已移除，避免复制到错误模块。
 
@@ -65,7 +66,7 @@ PB3/PB4 复位后与 JTAG 复用，`main.c` 已关闭 JTAG 并保留 SWD。PB2 �
 
 ## 3. 复制到 Keil µVision5
 
-浏览器工作台 → **项目源码** → 逐个打开上述 4 个文件 → **复制代码**，放到工程的 `User/` 目录。
+浏览器工作台 → **项目源码** → 逐个打开上述 3 个文件 → **复制代码**，放到工程的 `User/` 目录。不需要创建或复制 `matrix_firmware.h`。
 
 1. **从 Keil Target 移除旧的 `Hardware/app/app.c`、`Hardware/buttons/buttons.c`、`Hardware/matrix/matrix.c`。** 新主程序完全不调用它们；保留在磁盘不重要，但不要再加入编译。
 2. 如果 Project 中仍有 `Scene.c/scene.c`，也执行 **Remove File from Group / Remove Item**。本固件不使用 Scene、CatAnim、OLED 或数学模块，不能用空桩掩盖旧链接错误。
@@ -84,7 +85,7 @@ PB3/PB4 复位后与 JTAG 复用，`main.c` 已关闭 JTAG 并保留 SWD。PB2 �
 - PA4/PA5 第一个低电平 tick 立即步进，500 tick 后自动步进，PA6 拉低立即暂停。
 - 按下抖动不重复触发；连续松开 20 ms 后再次按下才产生下一事件。
 - 1～9 饱和、暂停恢复、PA7 无动作、SysTick 回绕均通过主机测试。
-- 主程序未引用旧 `App_/Buttons_/Matrix_` 外部符号；浏览器只提供 4 个交付源码文件。
+- 主程序未引用旧 `App_/Buttons_/Matrix_` 外部符号；浏览器只提供 3 个交付源码文件，且无自定义业务头文件依赖。
 - 独立 HEX 已按 Intel HEX 记录回读，并逐字节核对 ELF LOAD 段。
 
 尚未在用户的 `.pdsprj` 上直接运行 Proteus，也未把 Unicorn 的逻辑执行等同于 Proteus 电气模型。若严格加载新独立 HEX 仍无反应，下一步必须检查实际 Program File、`.uvprojx` 和 Keil Build Output，而不是再猜测按键算法。
