@@ -66,12 +66,18 @@ PB2 同时是 BOOT1；Proteus 可按上述方式使用。移植实物时，需�
 
 默认 `APP_STEP_TIME_MS = 500U`，位于 `app.h`，它只控制**首次立即步进之后**的自动间隔。上传的约 10.93 秒故障视频已经逐帧核对，PA4/PA5 都存在持续超过 20 ms 的高电平输入，因此本次修复针对“事件发生后首次变化还等待 500 ms”的确定交互缺陷，而不是取消必要消抖。视频没有展示正常目标动画，所以 500 ms 仍是工程默认值，不声称是从正常效果视频测得的参数。
 
+### 本次“始终全灭且按键无响应”的截图诊断
+
+截图中 PB0 为高、PB1～PB7 为低，PB8～PB15 全高。对于初始数字 1，PB0 对应的第一列恰好没有像素，因此该状态与**只完成第一次扫描后停住**完全一致，并不是一个完整刷新的数字 1。扫描和按键都由同一个 1 ms 任务驱动，所以两者同时无响应时，应优先修复定时任务的持续推进，而不是继续修改字模或盲目增加按键延时。新版因此提供明确的 SysTick 中断文件，并彻底取消主循环的 COUNTFLAG 依赖。
+
 ## 4. 复制到 Keil µVision5
 
 浏览器工作台 → **项目源码** → 逐个打开文件 → **复制代码**：
 
 ```text
 User/main.c
+User/stm32f10x_it.c
+User/stm32f10x_it.h
 Hardware/app/app.c
 Hardware/app/app.h
 Hardware/buttons/buttons.c
@@ -85,7 +91,7 @@ Hardware/matrix/matrix.h
 3. 目标器件选择 `STM32F103C8T6`，使用现有 CMSIS 启动文件与 `system_stm32f10x.c`。旧版 CMSIS 工程需定义 `STM32F10X_MD`。
 4. 本固件只依赖设备头 `stm32f10x.h`，不要求 HAL，也不要求添加标准外设库 GPIO 驱动文件。
 5. 如果原工程已有另一个 `main()`，只保留一个。
-6. `main.c` 不再定义 `SysTick_Handler()`，因此不会与 `stm32f10x_it.c` 重名。点阵任务使用 COUNTFLAG 轮询，同时保留 TICKINT，让原中断函数继续维护 `system_tick`。`main.c` 已提供唯一的 `volatile uint32_t system_tick = 0U` 定义；`main.h` 如需要声明，只能使用 `extern`，不能再定义一个实体。若现有声明采用其他整数类型，应以实际声明为准并告知后再调整，不能盲目复制不同类型。
+6. **用工作台内容替换原来的 `stm32f10x_it.c/.h`，不要再添加第二份中断文件。** 新文件只保留本点阵需要的 SysTick 时序：`SysTick_Handler()` 每 1 ms 递增 `system_tick`，主循环按累计 tick 补执行扫描与按键任务，不再读取 COUNTFLAG。`system_tick` 只在 `stm32f10x_it.c` 定义一次；`main.h` 如保留声明，只能是兼容类型的 `extern`，不能再定义实体。若旧中断文件还承担其他外设功能，应先把那些源码从 Target 移除或明确合并对应 ISR，不能同时保留两个同名 Handler。
 7. 在 Options for Target → Output 中勾选 **Create HEX File**，先 **Clean Targets**，再执行 **Rebuild all target files**。必须确认链接成功且 `.hex` 的修改时间已经更新，不能继续使用编译失败前留下的旧 AXF/HEX。
 8. 停止 Proteus 仿真，双击 STM32，将 **Program File** 明确指向本次生成的 `.hex`，再重新运行；不要沿用视频路径中无法确认版本的旧 `Project.axf`。
 
@@ -95,7 +101,8 @@ Hardware/matrix/matrix.h
 
 - 主机寄存器桩测试：扫描极性、8 列顺序、轻触按键消抖、首次立即步进、松开后继续、暂停恢复、1～9 饱和、PA7 无动作。
 - 暂停边界测试：在即将到达下一次递增前按 PA6，数字不额外跳变。
-- 全部四个 `.c` 使用 Thumb/Cortex-M3 目标、`STM32F10X_MD` 和真实旧版 CMSIS 头文件交叉编译，启用严格警告并将警告视为错误。
+- SysTick 测试：每毫秒递增、32 位自然回绕，以及 `main.c` 引用与 `stm32f10x_it.c` 唯一定义。
+- 全部五个 `.c` 使用 Thumb/Cortex-M3 目标、`STM32F10X_MD` 和真实旧版 CMSIS 头文件交叉编译，启用严格警告并将警告视为错误。
 - 浏览器文件来自真实 `stm32/project/code/`，可直接复制、编辑和再次保存。
 
 已收到并逐帧检查本次故障视频；尚未声称在你的具体 `.pdsprj` 文件上完成 Proteus 运行验证。最终仍应以本次成功链接的新 HEX 和实际仿真结果为准。

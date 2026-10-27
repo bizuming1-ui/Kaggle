@@ -4,7 +4,7 @@
 
 ## Proteus 8 × 8×8 点阵固件
 
-`stm32/project/code/` 现已包含一套可在工作台直接复制的 STM32F103C8T6 固件，目录与当前 Keil 工程对应：`User/main.c`、`Hardware/app/app.c/.h`、`Hardware/matrix/matrix.c/.h`、`Hardware/buttons/buttons.c/.h`。轻触 PA4/PA5 经 20 ms 消抖后立即递增/递减一步，随后按 500 ms 间隔继续到 9/1；PA6 立即停止。点阵采用 Proteus 默认列阳极/行阴极的 8 列动态扫描。跨目录头文件引用已修复，SysTick 使用轮询以避免与现有 `stm32f10x_it.c` 的重复中断符号。
+`stm32/project/code/` 现已包含一套可在工作台直接复制的 STM32F103C8T6 固件，目录与当前 Keil 工程对应：`User/main.c`、`User/stm32f10x_it.c/.h`、`Hardware/app/app.c/.h`、`Hardware/matrix/matrix.c/.h`、`Hardware/buttons/buttons.c/.h`。轻触 PA4/PA5 经 20 ms 消抖后立即递增/递减一步，随后按 500 ms 间隔继续到 9/1；PA6 立即停止。点阵采用 Proteus 默认列阳极/行阴极的 8 列动态扫描。工程提供唯一的 `SysTick_Handler` 和 `system_tick` 定义，主循环按累计毫秒 tick 持续扫描，不再依赖 `COUNTFLAG` 或未知的旧中断实现。
 
 精确接线、失效 `Scene.c` 引用处理、Keil 工程集成与验证边界见 [`PROTEUS_8X8_GUIDE.md`](./PROTEUS_8X8_GUIDE.md)。
 

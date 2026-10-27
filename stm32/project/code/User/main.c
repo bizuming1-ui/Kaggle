@@ -27,11 +27,7 @@
 /* main.c is in User/, while the confirmed app.h location is Hardware/app/.
    This relative include fixes ARMCC #5 without modifying global Include Paths. */
 #include "../Hardware/app/app.h"
-
-/* The existing stm32f10x_it.c refers to this legacy millisecond counter.
-   A header may declare it as extern, but exactly one C file must define it.
-   Do not add another definition in main.h or another C file. */
-volatile uint32_t system_tick = 0U;
+#include "stm32f10x_it.h"
 
 static void Board_ClockAndDebugInit(void)
 {
@@ -48,13 +44,15 @@ static void Board_ClockAndDebugInit(void)
 int main(void)
 {
     uint32_t ticks;
+    uint32_t lastTick;
+    uint32_t currentTick;
 
     Board_ClockAndDebugInit();
     App_Init();
 
-    /* The matrix task polls COUNTFLAG, so this file does not define a
-       SysTick_Handler. TICKINT remains enabled for the existing handler in
-       stm32f10x_it.c, which services the legacy system_tick counter. */
+    /* SysTick_Handler() in the supplied stm32f10x_it.c is the only timing
+       ISR. It increments system_tick; the main loop below never depends on
+       COUNTFLAG or on an unknown legacy interrupt implementation. */
     ticks = SystemCoreClock / 1000U;
     if ((ticks == 0U) || (ticks > 0x01000000UL))
     {
@@ -70,13 +68,19 @@ int main(void)
     SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk |
                     SysTick_CTRL_TICKINT_Msk |
                     SysTick_CTRL_ENABLE_Msk;
+    lastTick = system_tick;
 
     for (;;)
     {
-        /* COUNTFLAG is set every 1 ms and cleared by this CTRL read. */
-        if ((SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) != 0U)
+        currentTick = system_tick;
+
+        /* Unsigned tick arithmetic also handles the 32-bit wrap. Catch up
+           every elapsed millisecond so scanning and key sampling cannot stall
+           after one COUNTFLAG read or one delayed main-loop iteration. */
+        while (lastTick != currentTick)
         {
             App_Task1ms();
+            ++lastTick;
         }
     }
 }
