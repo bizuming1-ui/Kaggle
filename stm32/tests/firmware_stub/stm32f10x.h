@@ -54,6 +54,7 @@ extern SysTick_Type mock_systick;
 
 #define SysTick_CTRL_COUNTFLAG_Msk (0x00010000UL)
 #define SysTick_CTRL_CLKSOURCE_Msk (0x00000004UL)
+#define SysTick_CTRL_TICKINT_Msk (0x00000002UL)
 #define SysTick_CTRL_ENABLE_Msk (0x00000001UL)
 
 #define GPIO_Pin_4 ((uint16_t)0x0010U)

@@ -81,12 +81,12 @@ Hardware/matrix/matrix.h
 ```
 
 1. 按上述相同相对位置替换文件。`app.h` 是统一接口头，`app.c` 不再跨目录包含 `buttons.h` 或 `matrix.h`；`User/main.c` 使用已经由编译日志确认的 `../Hardware/app/app.h` 相对路径，因此不需要为这三个模块额外配置 Include Paths。
-2. 当前日志中的 `Hardware\Scene\Scene.c` 是失效文件引用。本次点阵程序不调用 Scene：在 Keil Project 窗口右击 `Scene.c`，选择 **Remove File from Group / Remove Item**（不要误删其他源码）。如果原项目确实需要 Scene 功能，则必须把真正的原文件恢复到该路径，不能用空文件掩盖问题。
+2. 当前日志仍同时出现 `Hardware\Scene\Scene.c` 缺失和旧 `scene.o` 的 CatAnim/OLED 未定义符号。本次点阵程序不调用 Scene：在 Keil Project 窗口右击所有 `Scene.c/scene.c` 条目，选择 **Remove File from Group / Remove Item**，然后执行 **Project → Clean Targets**，再全量 Rebuild，确保旧 `scene.o` 不再进入链接。如果原项目确实需要 Scene 功能，则必须恢复完整的 Scene、CatAnim、OLED、数学与按键源码，不能用空文件或空桩函数掩盖问题。
 3. 目标器件选择 `STM32F103C8T6`，使用现有 CMSIS 启动文件与 `system_stm32f10x.c`。旧版 CMSIS 工程需定义 `STM32F10X_MD`。
 4. 本固件只依赖设备头 `stm32f10x.h`，不要求 HAL，也不要求添加标准外设库 GPIO 驱动文件。
 5. 如果原工程已有另一个 `main()`，只保留一个。
-6. 新版 `main.c` 使用 SysTick COUNTFLAG 轮询，不再定义 `SysTick_Handler()`，所以不用删除或修改现有 `stm32f10x_it.c` 中的同名中断函数。
-7. 在 Options for Target → Output 中勾选 **Create HEX File**，执行 **Rebuild all target files**。
+6. `main.c` 不再定义 `SysTick_Handler()`，因此不会与 `stm32f10x_it.c` 重名。点阵任务使用 COUNTFLAG 轮询，同时保留 TICKINT，让原中断函数继续维护 `system_tick`。`main.c` 已提供唯一的 `volatile uint32_t system_tick = 0U` 定义；`main.h` 如需要声明，只能使用 `extern`，不能再定义一个实体。若现有声明采用其他整数类型，应以实际声明为准并告知后再调整，不能盲目复制不同类型。
+7. 在 Options for Target → Output 中勾选 **Create HEX File**，先 **Clean Targets**，再执行 **Rebuild all target files**。
 8. 在 Proteus 双击 STM32，将 **Program File** 指向生成的 `.hex`，再运行仿真。
 
 程序使用 `SystemCoreClockUpdate()` 后按 `SystemCoreClock / 1000` 配置 SysTick，不会把重装值写死为仅适用于 72 MHz 的常数。若工程时钟配置不同，应确保 `SystemCoreClock` 与实际时钟一致。

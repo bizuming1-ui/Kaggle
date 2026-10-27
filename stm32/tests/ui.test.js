@@ -84,6 +84,7 @@ test('real DOM workflow: select -> not persisted -> click save -> persisted -> e
   }, 'clicking save writes code/main.c');
   await waitFor(() => window.document.querySelectorAll('.queue-item').length === 0, 'saved item leaves the pending queue');
   await waitFor(() => window.document.querySelector('#recentFileBody').textContent.includes('main.c'), 'backend directory scan refreshes the project table');
+  await waitFor(() => window.document.querySelector('#saveState').textContent.includes('所有更改已落盘'), 'save refresh and notification finish before teardown');
   assert.equal(await fs.readFile(mainPath, 'utf8'), source);
   assert.match(window.document.querySelector('#recentFileBody').textContent, /main\.c/);
   assert.match(window.document.querySelector('#recentFileBody').textContent, /已落盘/);
@@ -101,6 +102,7 @@ test('real DOM workflow: select -> not persisted -> click save -> persisted -> e
   window.document.querySelector('#saveCurrent').click();
   await waitFor(async () => (await fs.readFile(mainPath, 'utf8')).includes('return 42'), 'Ctrl/S save-current path persists edits');
   await waitFor(() => window.document.querySelector('#pendingCount').hidden, 'draft is cleared after verified save');
+  await waitFor(() => window.document.querySelector('#saveState').textContent.includes('所有更改已落盘'), 'edited-file refresh and notification finish before teardown');
   assert.match(await fs.readFile(mainPath, 'utf8'), /return 42/);
   assert.deepEqual(browserErrors, []);
 });

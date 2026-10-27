@@ -28,6 +28,11 @@
    This relative include fixes ARMCC #5 without modifying global Include Paths. */
 #include "../Hardware/app/app.h"
 
+/* The existing stm32f10x_it.c refers to this legacy millisecond counter.
+   A header may declare it as extern, but exactly one C file must define it.
+   Do not add another definition in main.h or another C file. */
+volatile uint32_t system_tick = 0U;
+
 static void Board_ClockAndDebugInit(void)
 {
     RCC->APB2ENR |= RCC_APB2ENR_AFIOEN |
@@ -47,8 +52,9 @@ int main(void)
     Board_ClockAndDebugInit();
     App_Init();
 
-    /* Polling instead of a SysTick ISR avoids duplicate SysTick_Handler
-       symbols in existing Keil templates (for example stm32f10x_it.c). */
+    /* The matrix task polls COUNTFLAG, so this file does not define a
+       SysTick_Handler. TICKINT remains enabled for the existing handler in
+       stm32f10x_it.c, which services the legacy system_tick counter. */
     ticks = SystemCoreClock / 1000U;
     if ((ticks == 0U) || (ticks > 0x01000000UL))
     {
@@ -61,7 +67,9 @@ int main(void)
     SysTick->CTRL = 0U;
     SysTick->LOAD = ticks - 1U;
     SysTick->VAL = 0U;
-    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_ENABLE_Msk;
+    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk |
+                    SysTick_CTRL_TICKINT_Msk |
+                    SysTick_CTRL_ENABLE_Msk;
 
     for (;;)
     {

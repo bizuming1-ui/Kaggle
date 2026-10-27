@@ -27,4 +27,8 @@ SOURCES=(
 # Compile main.c too, without linking a second host main() into the test.
 "$CC" "${CFLAGS[@]}" "${INCLUDES[@]}" \
   -c "$ROOT/stm32/project/code/User/main.c" -o "$BUILD/main.o"
+if command -v nm >/dev/null 2>&1; then
+  nm "$BUILD/main.o" | grep -Eq '[[:space:]]system_tick$'
+  echo "legacy system_tick definition: PASS"
+fi
 echo "main.c host syntax/register compilation: PASS"
