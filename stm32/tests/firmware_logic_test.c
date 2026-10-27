@@ -129,6 +129,33 @@ static void test_immediate_up_and_stop_before_next_step(void)
     assert(Firmware_GetMode() == FW_PAUSED);
 }
 
+static void test_stuck_stop_cannot_veto_up_and_event_priority(void)
+{
+    reset_firmware();
+    set_pin(GPIO_Pin_6, 0);       /* STOP is already low from the first tick */
+    ticks(1U);                    /* consume exactly one initial STOP event */
+    assert(Firmware_GetDigit() == 1U);
+    assert(Firmware_GetMode() == FW_PAUSED);
+
+    set_pin(GPIO_Pin_4, 0);       /* PA6 remains stuck low */
+    ticks(1U);
+    assert(Firmware_GetDigit() == 2U); /* held STOP cannot veto this new UP event */
+    assert(Firmware_GetMode() == FW_COUNTING_UP);
+    ticks(FW_STEP_TIME_MS);
+    assert(Firmware_GetDigit() == 3U);
+
+    set_pin(GPIO_Pin_4, 1);
+    set_pin(GPIO_Pin_6, 1);
+    ticks(FW_RELEASE_MS);         /* re-arm both keys */
+    set_pin(GPIO_Pin_4, 0);
+    set_pin(GPIO_Pin_6, 0);       /* fresh simultaneous UP + STOP events */
+    ticks(1U);
+    assert(Firmware_GetDigit() == 3U); /* STOP still wins on its event tick */
+    assert(Firmware_GetMode() == FW_PAUSED);
+    set_pin(GPIO_Pin_4, 1);
+    set_pin(GPIO_Pin_6, 1);
+}
+
 static void test_short_tap_bounce_and_rearm(void)
 {
     reset_firmware();
@@ -262,10 +289,11 @@ int main(void)
     test_ready_from_first_tick_without_boot_animation();
     test_scan_and_idle_polarity();
     test_immediate_up_and_stop_before_next_step();
+    test_stuck_stop_cannot_veto_up_and_event_priority();
     test_short_tap_bounce_and_rearm();
     test_full_up_and_down_ranges();
     test_momentary_release_does_not_cancel_counting();
     test_pause_resume_and_pa7_is_unused();
-    puts("firmware logic: PASS (direct 1 boot, immediate PA4/PA5, complete momentary 1..8/8..1 timelines, 500 ms steps, 20 ms release re-arm, PA6 stop, PA7 unused)");
+    puts("firmware logic: PASS (direct 1 boot, full 1..8/8..1 timelines, momentary PA6 event priority, stuck-low STOP cannot veto PA4, 20 ms re-arm, PA7 unused)");
     return 0;
 }

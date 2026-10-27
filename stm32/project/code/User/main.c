@@ -10,7 +10,7 @@
  *   Released keys use internal pull-ups; pressed keys are LOW.
  *   Boot shows 1 and waits; PA4 counts 1..8, PA5 counts 8..1.
  *   A short press steps immediately, then continues every 500 ms.
- *   PA6 stops at the current digit; 20 ms HIGH releases/re-arms direction keys.
+ *   PA6 press stops once at the current digit; 20 ms HIGH re-arms all keys.
  *   PA7 is deliberately unused.
  *
  * Copy only User/main.c and User/stm32f10x_it.c/.h.
@@ -39,6 +39,7 @@ typedef enum
 #define FW_UNUSED_PIN         (0x0080U)   /* PA7 */
 #define FW_EVENT_UP           (0x01U)
 #define FW_EVENT_DOWN         (0x02U)
+#define FW_EVENT_STOP         (0x04U)
 
 /* Bit 0 is R1 (top), bit 7 is R8 (bottom), one byte per column. */
 static const uint8_t s_digitColumns[8][8] =
@@ -60,10 +61,11 @@ typedef struct
     uint8_t releaseMs;
 } FirmwareButton;
 
-static FirmwareButton s_directionButtons[2] =
+static FirmwareButton s_buttons[3] =
 {
     { FW_UP_PIN, 0U, 0U },
-    { FW_DOWN_PIN, 0U, 0U }
+    { FW_DOWN_PIN, 0U, 0U },
+    { FW_STOP_PIN, 0U, 0U }
 };
 
 static const uint8_t * volatile s_activeColumns;
@@ -136,10 +138,12 @@ static void Firmware_ButtonsInit(void)
     GPIOA->ODR |= (uint32_t)(FW_UP_PIN | FW_DOWN_PIN |
                               FW_STOP_PIN | FW_UNUSED_PIN);
 
-    s_directionButtons[0].pressedLatch = 0U;
-    s_directionButtons[0].releaseMs = 0U;
-    s_directionButtons[1].pressedLatch = 0U;
-    s_directionButtons[1].releaseMs = 0U;
+    s_buttons[0].pressedLatch = 0U;
+    s_buttons[0].releaseMs = 0U;
+    s_buttons[1].pressedLatch = 0U;
+    s_buttons[1].releaseMs = 0U;
+    s_buttons[2].pressedLatch = 0U;
+    s_buttons[2].releaseMs = 0U;
 }
 
 static uint8_t Firmware_ButtonEvents(void)
@@ -147,44 +151,39 @@ static uint8_t Firmware_ButtonEvents(void)
     uint8_t events = 0U;
     uint8_t index;
 
-    for (index = 0U; index < 2U; ++index)
+    for (index = 0U; index < 3U; ++index)
     {
-        uint8_t rawPressed = (GPIOA->IDR & s_directionButtons[index].pin) ? 0U : 1U;
+        uint8_t rawPressed = (GPIOA->IDR & s_buttons[index].pin) ? 0U : 1U;
 
         if (rawPressed != 0U)
         {
-            s_directionButtons[index].releaseMs = 0U;
-            if (s_directionButtons[index].pressedLatch == 0U)
+            s_buttons[index].releaseMs = 0U;
+            if (s_buttons[index].pressedLatch == 0U)
             {
                 /* Immediate short-press feedback, exactly once per press. */
-                s_directionButtons[index].pressedLatch = 1U;
+                s_buttons[index].pressedLatch = 1U;
                 events |= (uint8_t)(1U << index);
             }
         }
-        else if (s_directionButtons[index].pressedLatch != 0U)
+        else if (s_buttons[index].pressedLatch != 0U)
         {
-            if (s_directionButtons[index].releaseMs < FW_RELEASE_MS)
+            if (s_buttons[index].releaseMs < FW_RELEASE_MS)
             {
-                ++s_directionButtons[index].releaseMs;
+                ++s_buttons[index].releaseMs;
             }
-            if (s_directionButtons[index].releaseMs >= FW_RELEASE_MS)
+            if (s_buttons[index].releaseMs >= FW_RELEASE_MS)
             {
-                s_directionButtons[index].pressedLatch = 0U;
-                s_directionButtons[index].releaseMs = 0U;
+                s_buttons[index].pressedLatch = 0U;
+                s_buttons[index].releaseMs = 0U;
             }
         }
         else
         {
-            s_directionButtons[index].releaseMs = 0U;
+            s_buttons[index].releaseMs = 0U;
         }
     }
 
     return events;
-}
-
-static uint8_t Firmware_StopIsPressed(void)
-{
-    return (GPIOA->IDR & FW_STOP_PIN) ? 0U : 1U;
 }
 
 static void Firmware_StopNow(void)
@@ -277,8 +276,9 @@ void Firmware_Task1ms(void)
     Firmware_MatrixScan();
     events = Firmware_ButtonEvents();
 
-    /* STOP has priority over every direction event and pending auto step. */
-    if (Firmware_StopIsPressed() != 0U)
+    /* A new STOP press has priority only on its event tick. A stuck-low or
+       held STOP must not veto every later PA4/PA5 command forever. */
+    if ((events & FW_EVENT_STOP) != 0U)
     {
         Firmware_StopNow();
         return;

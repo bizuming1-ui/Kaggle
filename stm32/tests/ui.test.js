@@ -80,6 +80,7 @@ test('real DOM workflow: select -> not persisted -> click save -> persisted -> e
   assert.match(behaviorNotice.textContent, /PA5 降到 1/);
   assert.match(behaviorNotice.textContent, /PA6 暂停/);
   assert.match(behaviorNotice.textContent, /立即看到 2/);
+  assert.match(behaviorNotice.textContent, /持续低电平不会永久封锁 PA4\/PA5/);
 
   const source = '#include "stm32f10x.h"\r\n// 浏览器按钮真实保存测试\r\nint main(void) { return 0; }\r\n';
   await window.eval(`stageEntries([{ file: new File([${JSON.stringify(source)}], 'main.c', { type: 'text/plain' }), relativePath: 'main.c' }])`);
