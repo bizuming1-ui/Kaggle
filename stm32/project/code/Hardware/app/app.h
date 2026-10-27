@@ -24,4 +24,19 @@ uint8_t App_GetDigit(void);
 AppMode App_GetMode(void);
 uint32_t App_GetElapsedMs(void);
 
+/* Umbrella module interface for Keil projects that keep every peripheral in
+   a different Hardware subdirectory. app.c includes only this local header,
+   so it does not need project-wide Include Paths for buttons.h or matrix.h.
+   The declarations match matrix.h and buttons.h exactly. */
+#define BUTTON_EVENT_UP       0x01U
+#define BUTTON_EVENT_DOWN     0x02U
+
+void Matrix_Init(void);
+void Matrix_SetDigit(uint8_t digit);
+void Matrix_Scan1ms(void);
+
+void Buttons_Init(void);
+uint8_t Buttons_Scan1ms(void);
+uint8_t Buttons_StopIsPressed(void);
+
 #endif

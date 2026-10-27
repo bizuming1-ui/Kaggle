@@ -32,15 +32,29 @@ typedef struct
     volatile uint32_t MAPR;
 } AFIO_TypeDef;
 
+typedef struct
+{
+    volatile uint32_t CTRL;
+    volatile uint32_t LOAD;
+    volatile uint32_t VAL;
+    volatile uint32_t CALIB;
+} SysTick_Type;
+
 extern GPIO_TypeDef mock_gpioa;
 extern GPIO_TypeDef mock_gpiob;
 extern RCC_TypeDef mock_rcc;
 extern AFIO_TypeDef mock_afio;
+extern SysTick_Type mock_systick;
 
 #define GPIOA ((GPIO_TypeDef *)&mock_gpioa)
 #define GPIOB ((GPIO_TypeDef *)&mock_gpiob)
 #define RCC ((RCC_TypeDef *)&mock_rcc)
 #define AFIO ((AFIO_TypeDef *)&mock_afio)
+#define SysTick ((SysTick_Type *)&mock_systick)
+
+#define SysTick_CTRL_COUNTFLAG_Msk (0x00010000UL)
+#define SysTick_CTRL_CLKSOURCE_Msk (0x00000004UL)
+#define SysTick_CTRL_ENABLE_Msk (0x00000001UL)
 
 #define GPIO_Pin_4 ((uint16_t)0x0010U)
 #define GPIO_Pin_5 ((uint16_t)0x0020U)

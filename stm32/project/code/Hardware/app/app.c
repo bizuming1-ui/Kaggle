@@ -1,6 +1,4 @@
 #include "app.h"
-#include "buttons.h"
-#include "matrix.h"
 
 static uint8_t s_digit;
 static AppMode s_mode;

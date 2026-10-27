@@ -24,7 +24,9 @@
  *      limiting and row/column driver stages; do not exceed STM32 GPIO ratings.
  */
 #include "stm32f10x.h"
-#include "app.h"
+/* main.c is in User/, while the confirmed app.h location is Hardware/app/.
+   This relative include fixes ARMCC #5 without modifying global Include Paths. */
+#include "../Hardware/app/app.h"
 
 static void Board_ClockAndDebugInit(void)
 {
@@ -40,25 +42,33 @@ static void Board_ClockAndDebugInit(void)
 
 int main(void)
 {
+    uint32_t ticks;
+
     Board_ClockAndDebugInit();
     App_Init();
 
-    /* One interrupt per millisecond: matrix scan + buttons + counter. */
-    if (SysTick_Config(SystemCoreClock / 1000U) != 0U)
+    /* Polling instead of a SysTick ISR avoids duplicate SysTick_Handler
+       symbols in existing Keil templates (for example stm32f10x_it.c). */
+    ticks = SystemCoreClock / 1000U;
+    if ((ticks == 0U) || (ticks > 0x01000000UL))
     {
         for (;;)
         {
-            /* Invalid clock configuration: stop rather than run at a wrong rate. */
+            /* Invalid clock: stop rather than run at a wrong rate. */
         }
     }
 
+    SysTick->CTRL = 0U;
+    SysTick->LOAD = ticks - 1U;
+    SysTick->VAL = 0U;
+    SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_ENABLE_Msk;
+
     for (;;)
     {
-        __WFI();
+        /* COUNTFLAG is set every 1 ms and cleared by this CTRL read. */
+        if ((SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk) != 0U)
+        {
+            App_Task1ms();
+        }
     }
-}
-
-void SysTick_Handler(void)
-{
-    App_Task1ms();
 }

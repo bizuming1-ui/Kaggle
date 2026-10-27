@@ -71,33 +71,25 @@ PB2 同时是 BOOT1；Proteus 可按上述方式使用。移植实物时，需�
 浏览器工作台 → **项目源码** → 逐个打开文件 → **复制代码**：
 
 ```text
-main.c
-app.c
-app.h
-matrix.c
-matrix.h
-buttons.c
-buttons.h
+User/main.c
+Hardware/app/app.c
+Hardware/app/app.h
+Hardware/buttons/buttons.c
+Hardware/buttons/buttons.h
+Hardware/matrix/matrix.c
+Hardware/matrix/matrix.h
 ```
 
-1. 将四个 `.c` 加入同一个 Source Group；三个 `.h` 与源码放在同一目录，或把该目录加入 C/C++ Include Paths。
-2. 目标器件选择 `STM32F103C8T6`。
-3. 使用现有 CMSIS 启动文件与 `system_stm32f10x.c`。旧版 CMSIS 工程需定义 `STM32F10X_MD`。
-4. 本固件只包含 `stm32f10x.h`，不要求 HAL，也不要求添加标准外设库 GPIO 驱动文件。
+1. 按上述相同相对位置替换文件。`app.h` 是统一接口头，`app.c` 不再跨目录包含 `buttons.h` 或 `matrix.h`；`User/main.c` 使用已经由编译日志确认的 `../Hardware/app/app.h` 相对路径，因此不需要为这三个模块额外配置 Include Paths。
+2. 当前日志中的 `Hardware\Scene\Scene.c` 是失效文件引用。本次点阵程序不调用 Scene：在 Keil Project 窗口右击 `Scene.c`，选择 **Remove File from Group / Remove Item**（不要误删其他源码）。如果原项目确实需要 Scene 功能，则必须把真正的原文件恢复到该路径，不能用空文件掩盖问题。
+3. 目标器件选择 `STM32F103C8T6`，使用现有 CMSIS 启动文件与 `system_stm32f10x.c`。旧版 CMSIS 工程需定义 `STM32F10X_MD`。
+4. 本固件只依赖设备头 `stm32f10x.h`，不要求 HAL，也不要求添加标准外设库 GPIO 驱动文件。
 5. 如果原工程已有另一个 `main()`，只保留一个。
-6. 如果 `stm32f10x_it.c` 已有 `SysTick_Handler()`，也只保留一个。保留的函数必须调用：
-
-   ```c
-   void SysTick_Handler(void)
-   {
-       App_Task1ms();
-   }
-   ```
-
-7. 在 Options for Target → Output 中勾选 **Create HEX File**，编译全部文件。
+6. 新版 `main.c` 使用 SysTick COUNTFLAG 轮询，不再定义 `SysTick_Handler()`，所以不用删除或修改现有 `stm32f10x_it.c` 中的同名中断函数。
+7. 在 Options for Target → Output 中勾选 **Create HEX File**，执行 **Rebuild all target files**。
 8. 在 Proteus 双击 STM32，将 **Program File** 指向生成的 `.hex`，再运行仿真。
 
-程序使用 `SystemCoreClockUpdate()` 和 `SysTick_Config(SystemCoreClock / 1000)`，不会把 SysTick 写死为仅适用于 72 MHz 的常数。若工程时钟配置不同，应确保 `SystemCoreClock` 与实际时钟一致。
+程序使用 `SystemCoreClockUpdate()` 后按 `SystemCoreClock / 1000` 配置 SysTick，不会把重装值写死为仅适用于 72 MHz 的常数。若工程时钟配置不同，应确保 `SystemCoreClock` 与实际时钟一致。
 
 ## 5. 已完成的验证
 

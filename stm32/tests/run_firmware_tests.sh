@@ -7,11 +7,16 @@ trap 'rm -rf "$BUILD"' EXIT
 
 CC="${CC:-gcc}"
 CFLAGS=(-std=c99 -Wall -Wextra -Werror -pedantic -Wshadow -Wundef)
-INCLUDES=(-I"$ROOT/stm32/tests/firmware_stub" -I"$ROOT/stm32/project/code")
+INCLUDES=(
+  -I"$ROOT/stm32/tests/firmware_stub"
+  -I"$ROOT/stm32/project/code/Hardware/app"
+  -I"$ROOT/stm32/project/code/Hardware/buttons"
+  -I"$ROOT/stm32/project/code/Hardware/matrix"
+)
 SOURCES=(
-  "$ROOT/stm32/project/code/app.c"
-  "$ROOT/stm32/project/code/buttons.c"
-  "$ROOT/stm32/project/code/matrix.c"
+  "$ROOT/stm32/project/code/Hardware/app/app.c"
+  "$ROOT/stm32/project/code/Hardware/buttons/buttons.c"
+  "$ROOT/stm32/project/code/Hardware/matrix/matrix.c"
 )
 
 "$CC" "${CFLAGS[@]}" "${INCLUDES[@]}" \
@@ -21,5 +26,5 @@ SOURCES=(
 
 # Compile main.c too, without linking a second host main() into the test.
 "$CC" "${CFLAGS[@]}" "${INCLUDES[@]}" \
-  -c "$ROOT/stm32/project/code/main.c" -o "$BUILD/main.o"
+  -c "$ROOT/stm32/project/code/User/main.c" -o "$BUILD/main.o"
 echo "main.c host syntax/register compilation: PASS"

@@ -4,9 +4,9 @@
 
 ## Proteus 8 × 8×8 点阵固件
 
-`stm32/project/code/` 现已包含一套可在工作台直接复制的 STM32F103C8T6 固件：`main.c`、`app.c/.h`、`matrix.c/.h`、`buttons.c/.h`。实现 PA4 递增到 9、PA5 递减到 1、PA6 立即停止，以及 Proteus 默认列阳极/行阴极点阵的 8 列动态扫描。
+`stm32/project/code/` 现已包含一套可在工作台直接复制的 STM32F103C8T6 固件，目录与当前 Keil 工程对应：`User/main.c`、`Hardware/app/app.c/.h`、`Hardware/matrix/matrix.c/.h`、`Hardware/buttons/buttons.c/.h`。实现 PA4 递增到 9、PA5 递减到 1、PA6 立即停止，以及 Proteus 默认列阳极/行阴极点阵的 8 列动态扫描。跨目录头文件引用已修复，SysTick 使用轮询以避免与现有 `stm32f10x_it.c` 的重复中断符号。
 
-精确接线、Keil 工程集成、重复 `SysTick_Handler` 处理与验证边界见 [`PROTEUS_8X8_GUIDE.md`](./PROTEUS_8X8_GUIDE.md)。
+精确接线、失效 `Scene.c` 引用处理、Keil 工程集成与验证边界见 [`PROTEUS_8X8_GUIDE.md`](./PROTEUS_8X8_GUIDE.md)。
 
 ```bash
 npm run stm32:firmware-test
