@@ -65,7 +65,7 @@
         <button class="nav-item" data-nav="files"><svg><use href="#i-code"/></svg><span>项目源码</span><span class="nav-count" id="navCodeCount">0</span></button>
         <button class="nav-item" data-nav="videos"><svg><use href="#i-video"/></svg><span>参考视频</span><span class="nav-count" id="navVideoCount">0</span></button>
         <p class="nav-label nav-label--spaced">开发与验证</p>
-        <button class="nav-item" data-nav="simulation"><svg><use href="#i-chip"/></svg><span>硬件仿真</span><span class="nav-tag">待固件</span></button>
+        <button class="nav-item" data-nav="simulation"><svg><use href="#i-chip"/></svg><span>硬件仿真</span><span class="nav-tag">HEX 可用</span></button>
         <button class="nav-item" data-nav="history"><svg><use href="#i-history"/></svg><span>保存记录</span></button>
       </nav>
 
@@ -148,11 +148,11 @@
             <section class="panel board-panel">
               <div class="panel-heading">
                 <div class="panel-title"><span class="step-index">02</span><div><h2>目标硬件</h2><p>Blue Pill 外观与资源预览</p></div></div>
-                <span class="status-pill status-pill--idle"><i></i>等待固件</span>
+                <span class="status-pill status-pill--idle"><i></i>ARM 指令验证通过</span>
               </div>
               <div class="board-stage" data-board="compact"></div>
               <div class="board-caption"><span>STM32F103C8T6 · LQFP48</span><span>PC13 / USART1 / SWD</span></div>
-              <div class="board-disclaimer"><svg><use href="#i-info"/></svg><p>当前为硬件外观预览，不代表实时引脚电平。仿真行为将在读取你的固件与视频后配置。</p></div>
+              <div class="board-disclaimer"><svg><use href="#i-info"/></svg><p>独立 HEX 已完成离线 ARM 指令验证；这里仍只是外观预览，不代表实时电平或你的 Proteus 电气结果。</p></div>
               <button class="board-link" data-nav="simulation">查看硬件工作区<svg><use href="#i-arrow"/></svg></button>
             </section>
 
@@ -229,14 +229,14 @@
 
         <section class="view" id="view-simulation" data-title="硬件仿真">
           <div class="section-heading">
-            <div><p class="eyebrow"><span></span> HARDWARE SIMULATION</p><h1>硬件仿真</h1><p>目标已固定为 STM32F103C8T6。导入固件与参考视频后，再依据真实外设需求配置执行内核。</p></div>
-            <span class="status-pill status-pill--idle status-pill--large"><i></i>仿真内核待配置</span>
+            <div><p class="eyebrow"><span></span> HARDWARE SIMULATION</p><h1>硬件仿真</h1><p>独立 8 MHz HEX 已用真实 Thumb 指令验证扫描与按键，可下载到 Proteus 做 A/B 测试；浏览器实时内核仍未配置。</p></div>
+            <a class="button button--light" href="/firmware.hex" download="stm32f103-matrix-8mhz.hex"><svg><use href="#i-download"/></svg>下载已验证 HEX</a>
           </div>
-          <div class="honesty-notice"><svg><use href="#i-info"/></svg><div><strong>当前不会伪造运行结果</strong><p>通用 C/H 源码不能直接等同于可执行的 ARM 固件。后续需要依据 Keil 工程、启动文件、链接配置与外设依赖建立真实构建/仿真链路；目前此页只展示目标资源。</p></div></div>
+          <div class="honesty-notice"><svg><use href="#i-info"/></svg><div><strong>离线 ARM 验证通过，不等于 Proteus 已通过</strong><p>已实际执行当前五个业务 .c 生成的 Cortex-M3 代码，并核对 GPIOB 扫描、PA4/PA5/PA6 和 SysTick 参数。此页不显示虚构的实时运行结果；LED 压降、电流、Program File 与你的原理图仍需在 Proteus 中验证。</p></div></div>
           <div class="simulation-grid">
             <section class="panel simulation-board-panel"><div class="panel-heading"><div class="panel-title"><div><h2>Blue Pill 目标视图</h2><p>STM32F103C8T6 最小系统板</p></div></div><span class="mono-label">REV · F103C8</span></div><div class="board-stage board-stage--large" data-board="large"></div><div class="pin-legend"><span><i class="pin-dot pin-dot--green"></i>GPIO</span><span><i class="pin-dot pin-dot--orange"></i>POWER</span><span><i class="pin-dot pin-dot--blue"></i>DEBUG</span><span class="pin-legend-note">仅外观示意 · 非实时电平</span></div></section>
             <aside class="simulation-side">
-              <section class="panel run-control-panel"><div class="panel-heading"><div class="panel-title"><div><h2>运行控制</h2><p>等待可执行固件与仿真内核</p></div></div></div><div class="run-buttons"><button class="button button--primary" disabled title="导入固件并配置仿真内核后可用"><svg><use href="#i-play"/></svg>运行</button><button class="button button--light" disabled><svg><use href="#i-pause"/></svg>暂停</button><button class="icon-button" disabled><svg><use href="#i-reset"/></svg></button></div><div class="runtime-state"><span>执行状态</span><strong><i></i>未加载固件</strong></div><div class="runtime-state"><span>已执行周期</span><strong class="mono">—</strong></div><div class="runtime-state"><span>PC 指针</span><strong class="mono">0x────────</strong></div></section>
+              <section class="panel run-control-panel"><div class="panel-heading"><div class="panel-title"><div><h2>运行控制</h2><p>浏览器实时执行内核未配置</p></div></div></div><div class="run-buttons"><button class="button button--primary" disabled title="浏览器实时内核尚未配置；请下载 HEX 到 Proteus 验证"><svg><use href="#i-play"/></svg>运行</button><button class="button button--light" disabled><svg><use href="#i-pause"/></svg>暂停</button><button class="icon-button" disabled><svg><use href="#i-reset"/></svg></button></div><div class="runtime-state"><span>执行状态</span><strong><i></i>浏览器未运行</strong></div><div class="runtime-state"><span>已执行周期</span><strong class="mono">—</strong></div><div class="runtime-state"><span>PC 指针</span><strong class="mono">0x────────</strong></div></section>
               <section class="panel peripheral-panel"><div class="panel-heading"><div class="panel-title"><div><h2>目标资源</h2><p>芯片固定参数</p></div></div></div><div class="resource-row"><span>内核</span><strong>ARM Cortex-M3</strong></div><div class="resource-row"><span>最高主频</span><strong>72 MHz</strong></div><div class="resource-row"><span>Flash / SRAM</span><strong>64 KB / 20 KB</strong></div><div class="resource-row"><span>GPIO</span><strong>37 × I/O</strong></div><div class="resource-row"><span>USART</span><strong>3 路</strong></div><div class="resource-row"><span>调试接口</span><strong>SWD / JTAG</strong></div></section>
             </aside>
           </div>

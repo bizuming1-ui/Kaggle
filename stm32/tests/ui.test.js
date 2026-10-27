@@ -70,6 +70,10 @@ test('real DOM workflow: select -> not persisted -> click save -> persisted -> e
   assert.equal(window.document.querySelectorAll('.board-svg').length, 2);
   assert.equal(window.document.querySelector('#fatalBanner').hidden, true);
   assert.equal(window.document.querySelector('#pendingCount').hidden, true);
+  const firmwareLink = window.document.querySelector('a[href="/firmware.hex"]');
+  assert.ok(firmwareLink, 'hardware view exposes the verified Proteus HEX');
+  assert.equal(firmwareLink.getAttribute('download'), 'stm32f103-matrix-8mhz.hex');
+  assert.match(firmwareLink.textContent, /下载已验证 HEX/);
 
   const source = '#include "stm32f10x.h"\r\n// 浏览器按钮真实保存测试\r\nint main(void) { return 0; }\r\n';
   await window.eval(`stageEntries([{ file: new File([${JSON.stringify(source)}], 'main.c', { type: 'text/plain' }), relativePath: 'main.c' }])`);

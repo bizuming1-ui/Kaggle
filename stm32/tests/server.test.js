@@ -41,6 +41,8 @@ test('workbench serves its real UI and reports the fixed MCU target', async () =
   assert.match(html, /STM32F103C8T6/);
   assert.match(html, /保存到项目/);
   assert.match(html, /不是浏览器临时存储/);
+  assert.match(html, /href="\/firmware\.hex"/);
+  assert.match(html, /下载已验证 HEX/);
 
   const { response, body } = await responseJson(await fetch(`${base}/api/health`));
   assert.equal(response.status, 200);
@@ -50,6 +52,30 @@ test('workbench serves its real UI and reports the fixed MCU target', async () =
   assert.equal(body.target.mcu, 'STM32F103C8T6');
   assert.equal(body.target.flashKB, 64);
   assert.equal(body.simulation.configured, false);
+  assert.equal(body.simulation.offlineArmVerification, 'passed');
+  assert.equal(body.simulation.firmwareDownload, '/firmware.hex');
+});
+
+test('verified Proteus HEX downloads as the exact checksummed artifact', async () => {
+  const expected = await fs.readFile(new URL('../public/firmware.hex', import.meta.url));
+  const response = await fetch(`${base}/firmware.hex`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'application/octet-stream');
+  assert.equal(Number(response.headers.get('content-length')), expected.length);
+  const actual = Buffer.from(await response.arrayBuffer());
+  assert.deepEqual(actual, expected);
+
+  const lines = actual.toString('ascii').trim().split('\n');
+  assert.equal(lines[0], ':020000040800F2');
+  assert.equal(lines.at(-1), ':00000001FF');
+  for (const line of lines) {
+    assert.match(line, /^:[0-9A-F]+$/);
+    const record = Buffer.from(line.slice(1), 'hex');
+    assert.equal(record.reduce((sum, byte) => sum + byte, 0) & 0xff, 0);
+  }
+  const vector = Buffer.from(lines[1].slice(9, 25), 'hex');
+  assert.equal(vector.readUInt32LE(0), 0x20005000, 'initial Cortex-M3 stack pointer');
+  assert.equal(vector.readUInt32LE(4), 0x08000131, 'Thumb reset vector in Flash');
 });
 
 test('project is empty until an explicit save request writes a file', async () => {

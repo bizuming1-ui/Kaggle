@@ -6,7 +6,9 @@
 
 `stm32/project/code/` 现已包含一套可在工作台直接复制的 STM32F103C8T6 固件，目录与当前 Keil 工程对应：`User/main.c`、`User/stm32f10x_it.c/.h`、`Hardware/app/app.c/.h`、`Hardware/matrix/matrix.c/.h`、`Hardware/buttons/buttons.c/.h`。轻触 PA4/PA5 经 20 ms 消抖后立即递增/递减一步，随后按 500 ms 间隔继续到 9/1；PA6 立即停止。点阵采用 Proteus 默认列阳极/行阴极的 8 列动态扫描。工程提供唯一的 `SysTick_Handler` 和 `system_tick` 定义，主循环按累计毫秒 tick 持续扫描，不再依赖 `COUNTFLAG` 或未知的旧中断实现。
 
-精确接线、失效 `Scene.c` 引用处理、Keil 工程集成与验证边界见 [`PROTEUS_8X8_GUIDE.md`](./PROTEUS_8X8_GUIDE.md)。
+工作台另外提供 **`/firmware.hex`** 下载：这是当前五个 `.c` 的独立 8 MHz Proteus A/B 版本，用于排除旧 `Project.axf` 和 Keil 工程集成干扰。它已在 Unicorn 中实际执行 Thumb/Cortex-M3 指令，确认连续八列扫描和 PA4/PA5/PA6 行为；这不等于已经在用户的 Proteus 原理图上通过。
+
+精确接线、独立 HEX 使用方法、失效 `Scene.c` 引用处理与 Keil 工程集成见 [`PROTEUS_8X8_GUIDE.md`](./PROTEUS_8X8_GUIDE.md)；实测寄存器序列、像素重建、HEX 校验值与仿真边界见 [`ARM_VERIFICATION.md`](./ARM_VERIFICATION.md)。
 
 ```bash
 npm run stm32:firmware-test
@@ -71,7 +73,7 @@ STM32_PORT=3000 STM32_PROJECT_ROOT=/absolute/project/path npm run stm32:dev
 - **工作台**：混合导入源码和视频、待保存队列、真实保存状态、项目文件列表。
 - **项目源码**：目录筛选、C/H 查看与编辑、`Ctrl/Cmd + S` 保存当前、`Ctrl/Cmd + Shift + S` 保存全部。
 - **参考视频**：待保存临时预览与已保存项目流式预览，支持 HTTP Range。
-- **硬件仿真**：固定目标参数与 Blue Pill 外观视图；当前明确标注“等待固件”，不生成虚假 LED、USART 或周期数据。
+- **硬件仿真**：提供经过离线 ARM 指令级验证的独立 HEX 下载、固定目标参数与 Blue Pill 外观视图；浏览器实时执行内核仍未配置，不生成虚假 LED、USART 或周期数据。
 - **保存记录**：创建、更新、删除的时间、大小与 SHA-256 审计记录。
 
 ## Git 策略
@@ -119,6 +121,8 @@ npm run stm32:test
 
 原有 QTTS 测试仍使用 `npm test`，两个模块互不影响。
 
-## 当前边界：还没有宣称完成指令级仿真
+## 当前边界：离线 ARM 验证不等于 Proteus 电气验证
 
-通用 `.c/.h` 源码并不足以唯一确定 Keil 的可执行固件。真实仿真还需要依据用户工程确认启动文件、链接脚本、编译器/运行时库、外设依赖和期望行为。当前版本交付的是后续仿真的可靠工作区与持久化基础；硬件页不会用随机动画或假日志冒充运行结果。
+当前五个业务 `.c` 已在补充启动/链接支持后生成真实 Thumb ELF，并由 Unicorn 执行；独立 HEX 的扫描、按键和像素数据已有实测记录。测试框架按 1 ms 调用真实 SysTick Handler，并检查重装值，但未把 Unicorn 当作完整的周期精确 NVIC 或 Proteus 电气模型。
+
+浏览器页本身仍没有实时 ARM 内核，不会用随机动画或假日志冒充运行结果。用户具体 Keil 工程的启动/时钟文件、Proteus Program File、LED 压降与原理图仍需在 Proteus 中做最终 A/B 验证。

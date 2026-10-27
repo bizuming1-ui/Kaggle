@@ -511,7 +511,12 @@ export async function createStm32Server(options = {}) {
             video: files.filter((f) => f.kind === 'video').length,
           },
           git: gitCache,
-          simulation: { configured: false, state: 'awaiting_firmware' },
+          simulation: {
+            configured: false,
+            state: 'awaiting_browser_runtime',
+            offlineArmVerification: 'passed',
+            firmwareDownload: '/firmware.hex',
+          },
           serverTime: new Date().toISOString(),
         });
       }
