@@ -18,7 +18,7 @@ uint32_t SystemCoreClock = 72000000U;
 void SystemCoreClockUpdate(void) { }
 uint32_t SysTick_Config(uint32_t ticks) { (void)ticks; return 0U; }
 
-static void reset_firmware(void)
+static void reset_hardware(void)
 {
     memset(&mock_gpioa, 0, sizeof(mock_gpioa));
     memset(&mock_gpiob, 0, sizeof(mock_gpiob));
@@ -32,6 +32,12 @@ static void ticks(uint32_t count)
 {
     uint32_t i;
     for (i = 0U; i < count; ++i) Firmware_Task1ms();
+}
+
+static void reset_firmware(void)
+{
+    reset_hardware();
+    ticks(FW_STARTUP_SIGNATURE_MS);  /* enter the normal 1 + paused state */
 }
 
 static void set_pin(uint16_t pin, int high)
@@ -52,11 +58,32 @@ static void release_debounced(uint16_t pin)
     ticks(FW_RELEASE_MS);
 }
 
+static void test_startup_signature(void)
+{
+    reset_hardware();
+    assert(mock_gpiob.ODR == 0x0000FF00UL); /* no column selected before 1 ms task */
+    assert(Firmware_GetDigit() == FW_STARTUP_SIGNATURE_DIGIT);
+    assert(Firmware_GetMode() == FW_PAUSED);
+    set_pin(GPIO_Pin_4, 0);
+    ticks(1U);                       /* boot marker deliberately ignores keys */
+    assert(Firmware_GetDigit() == FW_STARTUP_SIGNATURE_DIGIT);
+    assert(Firmware_GetMode() == FW_PAUSED);
+    set_pin(GPIO_Pin_4, 1);
+    ticks(FW_STARTUP_SIGNATURE_MS - 2U);
+    assert(Firmware_GetDigit() == FW_STARTUP_SIGNATURE_DIGIT);
+    ticks(1U);
+    assert(Firmware_GetDigit() == FW_INITIAL_DIGIT);
+    assert(Firmware_GetMode() == FW_PAUSED);
+    assert(Firmware_GetElapsedMs() == 0U);
+}
+
 static void test_scan_and_idle_polarity(void)
 {
     uint8_t column;
+    uint8_t selected;
+    uint8_t firstColumn;
     reset_firmware();
-    assert(mock_gpiob.ODR == 0x0000FF00UL);
+    firstColumn = s_scanColumn;
     assert((mock_gpioa.ODR & 0x00F0UL) == 0x00F0UL); /* pull-ups selected */
     assert((mock_gpioa.CRL & 0xFFFF0000UL) == 0x88880000UL);
     assert(Firmware_GetDigit() == 1U);
@@ -65,13 +92,15 @@ static void test_scan_and_idle_polarity(void)
     for (column = 0U; column < 8U; ++column)
     {
         Firmware_Task1ms();
-        assert((mock_gpiob.ODR & 0xFFU) == ((uint32_t)1U << column));
+        selected = (uint8_t)((firstColumn + column) % 8U);
+        assert((mock_gpiob.ODR & 0xFFU) == ((uint32_t)1U << selected));
         /* Digit 1, C1/C2/C8 have no pixels: their rows stay all HIGH. */
-        if ((column == 0U) || (column == 1U) || (column == 7U))
+        if ((selected == 0U) || (selected == 1U) || (selected == 7U))
         {
             assert(((mock_gpiob.ODR >> 8) & 0xFFU) == 0xFFU);
         }
     }
+    assert(s_scanColumn == firstColumn);  /* exactly one complete 8-column frame */
     assert(Firmware_GetDigit() == 1U);       /* released HIGH inputs create no event */
     assert(Firmware_GetMode() == FW_PAUSED);
 }
@@ -226,12 +255,13 @@ static void test_pause_resume_and_pa7_is_unused(void)
 
 int main(void)
 {
+    test_startup_signature();
     test_scan_and_idle_polarity();
     test_immediate_up_and_stop_before_next_step();
     test_short_tap_bounce_and_rearm();
     test_full_up_and_down_ranges();
     test_momentary_release_does_not_cancel_counting();
     test_pause_resume_and_pa7_is_unused();
-    puts("firmware logic: PASS (scan, 1 ms active-LOW steps, press latch, 20 ms release re-arm, stop, 1..9 saturation, PA7 unused)");
+    puts("firmware logic: PASS (8->1 boot marker, scan, 1 ms active-LOW steps, press latch, 20 ms release re-arm, stop, 1..9 saturation, PA7 unused)");
     return 0;
 }

@@ -6,7 +6,7 @@
 
 `stm32/project/code/` 现在只保留 3 个交付文件：`User/main.c`、`User/stm32f10x_it.c/.h`。点阵、按键、计数、常量和类型全部收进自包含 `main.c`，不再需要 `matrix_firmware.h`，因此不会再出现漏复制该头文件导致的 ARMCC #5 错误。主程序也不调用旧 `App_*`、`Buttons_*` 或 `Matrix_*` 外部函数。
 
-PA4/PA5/PA6 按照片配置为**内部上拉、接 GND 时按下**。第一个低电平采样立即递增/递减并锁存，20 ms 只用于松开重新武装；随后每 500 ms 自动步进到 9/1，PA6 拉低立即暂停，PA7 无功能。点阵保持已能显示 1 的 `MATRIX-8X8-RED` 和 8 列动态扫描。工程只有唯一的 `SysTick_Handler` 和 `system_tick` 定义。
+本版上电先显示 `8` 约 512 ms，再自动恢复 `1` 并暂停，作为“新固件确实已加载”的可见标志。若 Proteus 从未出现这个 `8 → 1` 过程，应先修正 Program File / Keil 产物，而不是继续改按键算法。PA4/PA5/PA6 按照片配置为**内部上拉、接 GND 时按下**。第一个低电平采样立即递增/递减并锁存，20 ms 只用于松开重新武装；随后每 500 ms 自动步进到 9/1，PA6 拉低立即暂停，PA7 无功能。初始 `1` 已暂停时，PA5 到下限和 PA6 暂停本来就可能没有可见变化，关键输入测试是等 `8 → 1` 后轻触 PA4，观察是否立即变为 `2`。点阵保持已能显示 1 的 `MATRIX-8X8-RED` 和 8 列动态扫描。工程只有唯一的 `SysTick_Handler` 和 `system_tick` 定义。
 
 工作台另外提供 **`/firmware.hex`** 下载：它只由当前 `main.c + stm32f10x_it.c` 两个应用 `.c` 构建，用于排除旧 `Project.axf` 和 Keil 工程集成干扰。已在 Unicorn 中实际执行 Thumb/Cortex-M3 指令，确认连续八列扫描和 PA4/PA5/PA6 行为；这不等于已经在用户的 Proteus 原理图上通过。
 

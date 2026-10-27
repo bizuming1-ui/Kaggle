@@ -8,6 +8,7 @@
  *   Matrix bottom R1..R8 <- PB8..PB15   (row cathodes, LOW lights)
  *   PA4 UP, PA5 DOWN, PA6 STOP: other contact terminal -> GND.
  *   Released keys use internal pull-ups; pressed keys are LOW.
+ *   Boot shows 8 for 512 ms as a build marker, then shows 1 and pauses.
  *   First LOW sample steps immediately; 20 ms HIGH releases/re-arms.
  *   PA7 is deliberately unused.
  *
@@ -20,6 +21,8 @@
 /* All configuration and types live here too: no custom header is required. */
 #define FW_STEP_TIME_MS       500U
 #define FW_RELEASE_MS         20U
+#define FW_STARTUP_SIGNATURE_MS 512U  /* show 8 briefly, then normal digit 1 */
+#define FW_STARTUP_SIGNATURE_DIGIT 8U
 #define FW_INITIAL_DIGIT      1U
 #define FW_MIN_DIGIT          1U
 #define FW_MAX_DIGIT          9U
@@ -70,6 +73,7 @@ static uint8_t s_scanColumn;
 static uint8_t s_digit;
 static FirmwareMode s_mode;
 static uint32_t s_elapsedMs;
+static uint16_t s_startupMs;
 
 static void Board_ClockAndDebugInit(void)
 {
@@ -260,9 +264,12 @@ void Firmware_Init(void)
     Firmware_MatrixGpioInit();
     Firmware_ButtonsInit();
 
-    s_digit = FW_INITIAL_DIGIT;
+    /* Unambiguous build marker: new firmware shows 8 for about half a second.
+       If Proteus never shows 8, it is not running this newly built image. */
+    s_digit = FW_STARTUP_SIGNATURE_DIGIT;
     s_mode = FW_PAUSED;
     s_elapsedMs = 0U;
+    s_startupMs = FW_STARTUP_SIGNATURE_MS;
     Firmware_MatrixSetDigit(s_digit);
 }
 
@@ -271,6 +278,18 @@ void Firmware_Task1ms(void)
     uint8_t events;
 
     Firmware_MatrixScan();
+
+    if (s_startupMs != 0U)
+    {
+        --s_startupMs;
+        if (s_startupMs == 0U)
+        {
+            s_digit = FW_INITIAL_DIGIT;
+            Firmware_MatrixSetDigit(s_digit);
+        }
+        return;
+    }
+
     events = Firmware_ButtonEvents();
 
     /* STOP has priority over every direction event and pending auto step. */
