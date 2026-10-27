@@ -5,7 +5,12 @@
   "description": "QTTS browser console - dev tooling only (the runtime itself has no JS dependencies)",
   "type": "module",
   "scripts": {
-    "test": "node --experimental-vm-modules tools/web_smoke.mjs"
+    "test": "node --experimental-vm-modules tools/web_smoke.mjs",
+    "stm32:dev": "node stm32/server.js",
+    "stm32:test": "node --check stm32/public/app.js && node --test stm32/tests/*.test.js"
+  },
+  "dependencies": {
+    "iconv-lite": "^0.6.3"
   },
   "devDependencies": {
     "jsdom": "^24.0.0"

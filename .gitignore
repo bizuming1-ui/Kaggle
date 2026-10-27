@@ -14,12 +14,17 @@ tools_bin/
 rust/audio_rt/target/
 **/*.so
 
-# Node (dev tooling for tools/web_smoke.mjs)
+# Node (dev tooling and STM32 workbench server)
 node_modules/
-package-lock.json
 
 # Runtime state
 qtts/
 state/
 *.log
 .DS_Store
+
+# STM32 workbench runtime data. Source code remains trackable; potentially
+# large reference videos and the local audit log stay out of Git by default.
+stm32/project/videos/*
+!stm32/project/videos/.gitkeep
+stm32/project/.workspace/

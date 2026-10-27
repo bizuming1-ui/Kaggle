@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0f14">
+  <meta name="description" content="STM32F103C8T6 浏览器工作台：上传 Keil C/H 源码与参考视频，明确保存到真实项目文件系统。">
+  <title>F103 Studio · STM32 浏览器工作台</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <svg class="svg-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <symbol id="i-chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 1v3m6-3v3M9 20v3m6-3v3M1 9h3m-3 6h3m16-6h3m-3 6h3M4 4l2 2m12 12 2 2M20 4l-2 2M6 18l-2 2"/></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5V6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6M8 13h8m-8 4h5"/></symbol>
+      <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 9-3 3 3 3m8-6 3 3-3 3m-3-9-2 12"/></symbol>
+      <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="m17 10 4-2v8l-4-2m-7-5 4 3-4 3Z"/></symbol>
+      <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5m4-1v5l3 2"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
+      <symbol id="i-save" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+      <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.7 2.4 18a2 2 0 0 0 1.8 3h15.6a2 2 0 0 0 1.8-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m3 0-1 15H6L5 6m5 4v7m4-7v7"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v13m-5-5 5 5 5-5M4 17v3h16v-3"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 8a7 7 0 0 1 11.5-2.6L20 8M4 16l2.4 2.6A7 7 0 0 0 17.9 16"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+      <symbol id="i-github" viewBox="0 0 24 24"><path d="M15 22v-4c.1-1-.3-2-1-2.5 3.3-.4 6.8-1.6 6.8-7.4A5.8 5.8 0 0 0 19.3 4 5.4 5.4 0 0 0 19.1 0S17.9-.4 15 1.6a13.4 13.4 0 0 0-7 0C5.1-.4 3.9 0 3.9 0a5.4 5.4 0 0 0-.2 4A5.8 5.8 0 0 0 2.2 8c0 5.8 3.5 7 6.8 7.4-.4.4-.8 1-.9 1.9-.8.4-2.8 1-4-1.2-.8-1.3-2.1-1.4-2.1-1.4-1.3 0-.1.8-.1.8 1.4.6 2.4 3 2.4 3 .8 2.3 3.7 1.7 3.7 1.7V22"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7Z"/></symbol>
+      <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+      <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 4v6h6M5.5 15a7 7 0 1 0 .5-7l-2 2"/></symbol>
+      <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3m6 0h4"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></symbol>
+      <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="19" r="2"/><path d="M6 7v10M18 8c0 5-5 4-8 5"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <span class="brand-mark"><svg><use href="#i-chip"/></svg></span>
+        <span class="brand-type"><strong>F103<span>STUDIO</span></strong><small>STM32 WORKBENCH</small></span>
+      </div>
+
+      <div class="target-card">
+        <div class="target-card__top"><span class="target-pulse"></span><span>当前目标芯片</span><span class="target-lock">已锁定</span></div>
+        <strong>STM32F103C8T6</strong>
+        <div class="target-card__meta"><span>ARM Cortex-M3</span><span>72 MHz</span></div>
+      </div>
+
+      <nav class="side-nav" aria-label="工作区导航">
+        <p class="nav-label">工作区</p>
+        <button class="nav-item active" data-nav="workspace"><svg><use href="#i-grid"/></svg><span>工作台</span></button>
+        <button class="nav-item" data-nav="files"><svg><use href="#i-code"/></svg><span>项目源码</span><span class="nav-count" id="navCodeCount">0</span></button>
+        <button class="nav-item" data-nav="videos"><svg><use href="#i-video"/></svg><span>参考视频</span><span class="nav-count" id="navVideoCount">0</span></button>
+        <p class="nav-label nav-label--spaced">开发与验证</p>
+        <button class="nav-item" data-nav="simulation"><svg><use href="#i-chip"/></svg><span>硬件仿真</span><span class="nav-tag">待固件</span></button>
+        <button class="nav-item" data-nav="history"><svg><use href="#i-history"/></svg><span>保存记录</span></button>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+      <div class="storage-card">
+        <div class="storage-card__title"><span class="connection-dot" id="sideConnectionDot"></span><span id="sideConnectionText">正在连接项目服务</span></div>
+        <p>真实存储位置</p>
+        <code>stm32/project/</code>
+        <div class="storage-card__bar"><i id="storageBar"></i></div>
+        <small id="storageSummary">读取项目文件中…</small>
+      </div>
+      <div class="git-line"><svg><use href="#i-branch"/></svg><span id="gitBranch">arena/5e41fcd2-kaggle</span><span class="git-dot"></span></div>
+    </aside>
+
+    <div class="sidebar-scrim" id="sidebarScrim"></div>
+
+    <div class="main-column">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="icon-button mobile-menu" id="mobileMenu" aria-label="打开导航"><svg><use href="#i-menu"/></svg></button>
+          <div class="breadcrumb"><span>STM32 项目</span><svg><use href="#i-chevron"/></svg><strong id="breadcrumbCurrent">工作台</strong></div>
+        </div>
+        <div class="topbar-actions">
+          <div class="save-state" id="saveState"><span class="save-state__dot"></span><span>项目已同步</span></div>
+          <button class="button button--quiet topbar-import" data-action="import"><svg><use href="#i-upload"/></svg><span>导入文件</span></button>
+          <button class="button button--primary" id="saveAllButton"><svg><use href="#i-save"/></svg><span>保存到项目</span><span class="button-count" id="pendingCount" hidden>0</span></button>
+        </div>
+        <div class="global-progress" id="globalProgress"></div>
+      </header>
+
+      <main class="main-content">
+        <section class="view active" id="view-workspace" data-title="工作台">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow"><span></span> KEIL µVISION5 · BROWSER WORKSPACE</p>
+              <h1>固件与参考，<em>放进同一个工作区。</em></h1>
+              <p class="page-description">上传 STM32 源码和演示视频，在浏览器中整理、预览与编辑。点击保存后，文件由后端真正写入当前项目。</p>
+            </div>
+            <div class="chip-specs" aria-label="芯片参数">
+              <div><strong>72<small>MHz</small></strong><span>主频</span></div>
+              <i></i>
+              <div><strong>64<small>KB</small></strong><span>Flash</span></div>
+              <i></i>
+              <div><strong>20<small>KB</small></strong><span>SRAM</span></div>
+            </div>
+          </div>
+
+          <div class="persistence-banner">
+            <span class="banner-icon"><svg><use href="#i-check-circle"/></svg></span>
+            <div><strong>不是浏览器临时存储</strong><p>保存按钮调用项目后端，原子写入磁盘并回读校验；刷新页面后仍可从项目目录重新载入。</p></div>
+            <code>stm32/project/</code>
+          </div>
+
+          <div class="dashboard-grid">
+            <section class="panel import-panel">
+              <div class="panel-heading">
+                <div class="panel-title"><span class="step-index">01</span><div><h2>导入项目素材</h2><p>Keil 源码与硬件演示视频</p></div></div>
+                <span class="format-label">.C&nbsp;&nbsp;.H&nbsp;&nbsp;VIDEO</span>
+              </div>
+              <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="选择或拖入源码与视频">
+                <input type="file" id="fileInput" multiple accept=".c,.h,.mp4,.webm,.mov,.m4v,.avi,.mkv,video/*" hidden>
+                <input type="file" id="folderInput" webkitdirectory directory multiple hidden>
+                <div class="dropzone-orbit"><span></span><svg><use href="#i-upload"/></svg></div>
+                <h3>拖入文件，开始建立工作区</h3>
+                <p>支持多选和文件夹，目录结构会保留</p>
+                <div class="dropzone-actions">
+                  <button class="button button--light" id="chooseFiles">选择文件</button>
+                  <button class="button button--text" id="chooseFolder">选择文件夹<svg><use href="#i-arrow"/></svg></button>
+                </div>
+                <small>源码 ≤ 2 MB / 个 · 视频 ≤ 500 MB / 个</small>
+              </div>
+
+              <div class="queue-section">
+                <div class="queue-heading"><div><h3>待保存队列</h3><span id="queueCountLabel">0 个文件</span></div><button class="text-button" id="clearQueue" hidden>清空队列</button></div>
+                <div class="queue-empty" id="queueEmpty"><span class="queue-empty-icon"><svg><use href="#i-file"/></svg></span><p>还没有待保存的文件</p><small>此处文件仅完成选择，点击“保存到项目”后才写入磁盘</small></div>
+                <div class="queue-list" id="queueList"></div>
+              </div>
+            </section>
+
+            <section class="panel board-panel">
+              <div class="panel-heading">
+                <div class="panel-title"><span class="step-index">02</span><div><h2>目标硬件</h2><p>Blue Pill 外观与资源预览</p></div></div>
+                <span class="status-pill status-pill--idle"><i></i>等待固件</span>
+              </div>
+              <div class="board-stage" data-board="compact"></div>
+              <div class="board-caption"><span>STM32F103C8T6 · LQFP48</span><span>PC13 / USART1 / SWD</span></div>
+              <div class="board-disclaimer"><svg><use href="#i-info"/></svg><p>当前为硬件外观预览，不代表实时引脚电平。仿真行为将在读取你的固件与视频后配置。</p></div>
+              <button class="board-link" data-nav="simulation">查看硬件工作区<svg><use href="#i-arrow"/></svg></button>
+            </section>
+
+            <aside class="panel save-flow-panel">
+              <div class="panel-heading"><div class="panel-title"><span class="step-index">03</span><div><h2>写入项目</h2><p>一次点击，完成持久化</p></div></div></div>
+              <ol class="save-flow">
+                <li><span><svg><use href="#i-upload"/></svg></span><div><strong>选择素材</strong><p>文件先进入待保存队列</p></div></li>
+                <li><span><svg><use href="#i-save"/></svg></span><div><strong>点击保存到项目</strong><p>后端按类型写入真实目录</p></div></li>
+                <li><span><svg><use href="#i-check"/></svg></span><div><strong>SHA-256 回读校验</strong><p>确认磁盘内容与上传一致</p></div></li>
+              </ol>
+              <div class="path-list">
+                <div><span class="file-type-icon file-type-icon--c">C</span><p>源码目录<code>code/</code></p></div>
+                <div><span class="file-type-icon file-type-icon--video"><svg><use href="#i-video"/></svg></span><p>视频目录<code>videos/</code></p></div>
+              </div>
+              <button class="button button--primary button--full" id="flowSaveButton"><svg><use href="#i-save"/></svg>保存到项目</button>
+              <p class="save-hint" id="flowSaveHint">当前没有待保存的更改</p>
+            </aside>
+          </div>
+
+          <section class="panel recent-panel">
+            <div class="panel-heading">
+              <div class="panel-title"><div><h2>项目中的文件</h2><p>以下记录来自后端目录扫描，并非浏览器缓存</p></div></div>
+              <button class="text-button" data-nav="files">打开项目源码<svg><use href="#i-arrow"/></svg></button>
+            </div>
+            <div class="table-wrap">
+              <table class="file-table">
+                <thead><tr><th>文件</th><th>类型</th><th>大小</th><th>保存时间</th><th>状态</th><th><span class="sr-only">操作</span></th></tr></thead>
+                <tbody id="recentFileBody"></tbody>
+              </table>
+              <div class="table-empty" id="recentEmpty"><svg><use href="#i-folder"/></svg><strong>项目目录还是空的</strong><p>导入你的第一个 <code>main.c</code>、头文件或参考视频。</p><button class="button button--light" data-action="import"><svg><use href="#i-upload"/></svg>导入文件</button></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-files" data-title="项目源码">
+          <div class="section-heading">
+            <div><p class="eyebrow"><span></span> SOURCE EXPLORER</p><h1>项目源码</h1><p>读取与修改都直接对应项目中的真实文件。Keil 常见中文编码与换行格式会被保留。</p></div>
+            <button class="button button--light" data-action="import"><svg><use href="#i-upload"/></svg>导入源码</button>
+          </div>
+          <div class="editor-layout">
+            <aside class="panel file-explorer">
+              <div class="explorer-top"><div><svg><use href="#i-folder"/></svg><strong>STM32-PROJECT</strong></div><button class="icon-button" id="refreshFiles" title="刷新项目"><svg><use href="#i-refresh"/></svg></button></div>
+              <label class="search-box"><svg><use href="#i-search"/></svg><input id="fileSearch" type="search" placeholder="筛选 .c / .h 文件" autocomplete="off"></label>
+              <div class="explorer-root"><span>code/</span><small id="explorerCount">0 个文件</small></div>
+              <div class="file-tree" id="fileTree"></div>
+              <div class="explorer-empty" id="explorerEmpty"><svg><use href="#i-code"/></svg><p>还没有源码文件</p><button class="text-button" data-action="import">现在导入</button></div>
+              <div class="explorer-staged" id="explorerStaged"></div>
+            </aside>
+            <section class="panel code-editor-panel">
+              <div class="editor-empty" id="editorEmpty"><div class="editor-empty-graphic"><span>{</span><svg><use href="#i-code"/></svg><span>}</span></div><h2>选择一份源码开始查看</h2><p>支持 .c / .h 文件，保存时保留原编码与 CRLF / LF。</p><div class="keyboard-hint"><kbd>Ctrl</kbd><span>+</span><kbd>S</kbd><span>保存当前文件</span></div></div>
+              <div class="editor-workspace" id="editorWorkspace" hidden>
+                <div class="editor-tabs"><div class="editor-tab"><span class="unsaved-dot" id="editorDirtyDot" hidden></span><svg><use href="#i-file"/></svg><span id="editorTabName">main.c</span><button id="closeEditor" aria-label="关闭编辑器"><svg><use href="#i-x"/></svg></button></div><div class="editor-actions"><button class="icon-button" id="downloadCurrent" title="下载原文件"><svg><use href="#i-download"/></svg></button><button class="button button--small button--light" id="saveCurrent"><svg><use href="#i-save"/></svg>保存当前</button></div></div>
+                <div class="editor-meta"><span id="editorPath">code/main.c</span><div><span id="editorEncoding">UTF-8</span><i></i><span id="editorLineEnding">LF</span><i></i><span id="editorSourceState">已保存</span></div></div>
+                <div class="code-area"><pre class="line-numbers" id="lineNumbers" aria-hidden="true">1</pre><textarea id="codeEditor" aria-label="源码编辑器" spellcheck="false" wrap="off"></textarea></div>
+                <div class="editor-statusbar"><span id="cursorPosition">Ln 1, Col 1</span><span id="editorCharCount">0 字符</span><span class="editor-status-spacer"></span><span>Keil C51? 否 · ARM Compiler 工程源码</span></div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-videos" data-title="参考视频">
+          <div class="section-heading">
+            <div><p class="eyebrow"><span></span> REFERENCE FOOTAGE</p><h1>参考视频</h1><p>用实际硬件表现校准后续仿真。待保存视频使用临时预览，保存后从项目目录流式读取。</p></div>
+            <button class="button button--light" data-action="import"><svg><use href="#i-upload"/></svg>导入视频</button>
+          </div>
+          <div class="video-layout">
+            <section class="panel video-player-panel">
+              <div class="video-player-empty" id="videoPlayerEmpty"><span><svg><use href="#i-play"/></svg></span><h2>选择视频进行对照</h2><p>MP4 / WebM 可直接预览；其他格式能否播放取决于浏览器编解码器。</p></div>
+              <div class="video-player" id="videoPlayerWrap" hidden><video id="videoPlayer" controls preload="metadata"></video><div class="video-player-info"><div><strong id="videoPlayerName"></strong><span id="videoPlayerPath"></span></div><a class="icon-button" id="downloadVideo" title="下载视频"><svg><use href="#i-download"/></svg></a></div></div>
+            </section>
+            <aside class="panel video-library"><div class="panel-heading"><div class="panel-title"><div><h2>视频库</h2><p id="videoLibraryCount">0 个参考视频</p></div></div></div><div class="video-list" id="videoList"></div><div class="video-library-empty" id="videoLibraryEmpty"><svg><use href="#i-video"/></svg><p>还没有参考视频</p><button class="text-button" data-action="import">导入第一段视频</button></div></aside>
+          </div>
+        </section>
+
+        <section class="view" id="view-simulation" data-title="硬件仿真">
+          <div class="section-heading">
+            <div><p class="eyebrow"><span></span> HARDWARE SIMULATION</p><h1>硬件仿真</h1><p>目标已固定为 STM32F103C8T6。导入固件与参考视频后，再依据真实外设需求配置执行内核。</p></div>
+            <span class="status-pill status-pill--idle status-pill--large"><i></i>仿真内核待配置</span>
+          </div>
+          <div class="honesty-notice"><svg><use href="#i-info"/></svg><div><strong>当前不会伪造运行结果</strong><p>通用 C/H 源码不能直接等同于可执行的 ARM 固件。后续需要依据 Keil 工程、启动文件、链接配置与外设依赖建立真实构建/仿真链路；目前此页只展示目标资源。</p></div></div>
+          <div class="simulation-grid">
+            <section class="panel simulation-board-panel"><div class="panel-heading"><div class="panel-title"><div><h2>Blue Pill 目标视图</h2><p>STM32F103C8T6 最小系统板</p></div></div><span class="mono-label">REV · F103C8</span></div><div class="board-stage board-stage--large" data-board="large"></div><div class="pin-legend"><span><i class="pin-dot pin-dot--green"></i>GPIO</span><span><i class="pin-dot pin-dot--orange"></i>POWER</span><span><i class="pin-dot pin-dot--blue"></i>DEBUG</span><span class="pin-legend-note">仅外观示意 · 非实时电平</span></div></section>
+            <aside class="simulation-side">
+              <section class="panel run-control-panel"><div class="panel-heading"><div class="panel-title"><div><h2>运行控制</h2><p>等待可执行固件与仿真内核</p></div></div></div><div class="run-buttons"><button class="button button--primary" disabled title="导入固件并配置仿真内核后可用"><svg><use href="#i-play"/></svg>运行</button><button class="button button--light" disabled><svg><use href="#i-pause"/></svg>暂停</button><button class="icon-button" disabled><svg><use href="#i-reset"/></svg></button></div><div class="runtime-state"><span>执行状态</span><strong><i></i>未加载固件</strong></div><div class="runtime-state"><span>已执行周期</span><strong class="mono">—</strong></div><div class="runtime-state"><span>PC 指针</span><strong class="mono">0x────────</strong></div></section>
+              <section class="panel peripheral-panel"><div class="panel-heading"><div class="panel-title"><div><h2>目标资源</h2><p>芯片固定参数</p></div></div></div><div class="resource-row"><span>内核</span><strong>ARM Cortex-M3</strong></div><div class="resource-row"><span>最高主频</span><strong>72 MHz</strong></div><div class="resource-row"><span>Flash / SRAM</span><strong>64 KB / 20 KB</strong></div><div class="resource-row"><span>GPIO</span><strong>37 × I/O</strong></div><div class="resource-row"><span>USART</span><strong>3 路</strong></div><div class="resource-row"><span>调试接口</span><strong>SWD / JTAG</strong></div></section>
+            </aside>
+          </div>
+          <section class="panel serial-panel"><div class="panel-heading"><div class="panel-title"><svg class="panel-heading-icon"><use href="#i-terminal"/></svg><div><h2>串口监视器</h2><p>USART1 · 115200 8-N-1（预设）</p></div></div><span class="status-pill status-pill--idle"><i></i>未连接</span></div><div class="serial-output"><span class="serial-dim">F103 Studio console</span><br><span class="serial-dim">等待仿真内核与固件输出；此处不会生成模拟日志。</span><br><span class="serial-prompt">_</span></div></section>
+        </section>
+
+        <section class="view" id="view-history" data-title="保存记录">
+          <div class="section-heading"><div><p class="eyebrow"><span></span> PERSISTENCE AUDIT LOG</p><h1>保存记录</h1><p>每次后端创建、更新或删除项目文件都会留下记录，并包含落盘后的 SHA-256。</p></div><button class="button button--light" id="refreshHistory"><svg><use href="#i-refresh"/></svg>刷新记录</button></div>
+          <section class="panel history-panel"><div class="history-head"><span>操作 / 文件</span><span>大小</span><span>SHA-256</span><span>时间</span></div><div id="historyList" class="history-list"></div><div class="history-empty" id="historyEmpty"><svg><use href="#i-history"/></svg><h2>还没有保存记录</h2><p>第一次点击“保存到项目”后，这里会出现可核对的落盘记录。</p></div></section>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="toast-region" id="toastRegion" role="status" aria-live="polite"></div>
+
+  <dialog class="modal" id="confirmModal">
+    <form method="dialog">
+      <div class="modal-icon" id="modalIcon"><svg><use href="#i-alert"/></svg></div>
+      <h2 id="modalTitle">确认操作</h2>
+      <p id="modalMessage"></p>
+      <div class="modal-details" id="modalDetails" hidden></div>
+      <div class="modal-actions"><button class="button button--light" value="cancel">取消</button><button class="button button--primary" id="modalConfirm" value="confirm">确认</button></div>
+    </form>
+  </dialog>
+
+  <div class="fatal-banner" id="fatalBanner" hidden><svg><use href="#i-alert"/></svg><div><strong>项目服务连接失败</strong><p id="fatalMessage">请确认后端已启动。上传的内容不会仅保存在浏览器中。</p></div><button class="button button--light" id="retryConnection">重新连接</button></div>
+</body>
+</html>

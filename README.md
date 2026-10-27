@@ -3,6 +3,18 @@
 > 打字或说话 → DeepSeek V4 流式作答 → 韵律分句 → **双 T4 并行克隆合成** → 边生成边播放，
 > **首音 < 3 秒**、**会话 RTF < 0.5**、随时开口可打断。一键部署到 Kaggle。
 
+## 独立模块：STM32F103C8T6 浏览器工作台
+
+仓库新增 [`stm32/`](./stm32/) 模块，用于上传 Keil `.c/.h` 源码与参考视频、在浏览器中查看/编辑，并通过后端将文件**真实保存到 `stm32/project/`**。它不使用浏览器本地存储代替项目落盘，支持 GB18030 中文与 CRLF，带 SHA-256 回读校验及保存审计。
+
+```bash
+npm install
+npm run stm32:dev   # 0.0.0.0:3000
+npm run stm32:test
+```
+
+详见 [`stm32/README.md`](./stm32/README.md)。该模块与下方 QTTS 系统相互独立。
+
 ## 快速开始（Kaggle，约 3 分钟设置）
 
 1. 新建 Notebook → ⚙ **Accelerator: GPU T4 ×2**，**Internet: On**
