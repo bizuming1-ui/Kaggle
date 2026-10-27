@@ -65,25 +65,28 @@ static void test_scan_and_idle_polarity(void)
     }
 }
 
-static void test_debounce_up_and_stop_before_step(void)
+static void test_immediate_up_and_stop_before_next_step(void)
 {
     reset_firmware();
     set_pin(GPIO_Pin_4, 1);
     ticks(BUTTON_DEBOUNCE_MS - 1U);
     assert(App_GetMode() == APP_PAUSED);
     assert(App_GetDigit() == 1U);
-    ticks(1U);
+
+    ticks(1U);                    /* debounced momentary rising edge */
     assert(App_GetMode() == APP_COUNTING_UP);
+    assert(App_GetDigit() == 2U); /* immediate first step, not +500 ms */
+    assert(App_GetElapsedMs() == 0U);
 
     ticks(APP_STEP_TIME_MS - 1U);
-    assert(App_GetDigit() == 1U);
+    assert(App_GetDigit() == 2U);
     set_pin(GPIO_Pin_6, 1);       /* raw STOP has priority on this very tick */
     ticks(1U);
     assert(App_GetMode() == APP_PAUSED);
-    assert(App_GetDigit() == 1U); /* no unintended increment to 2 */
+    assert(App_GetDigit() == 2U); /* no unintended increment to 3 */
     assert(App_GetElapsedMs() == 0U);
     ticks(1000U);
-    assert(App_GetDigit() == 1U);
+    assert(App_GetDigit() == 2U);
 
     set_pin(GPIO_Pin_6, 0);
     release_debounced(GPIO_Pin_4);
@@ -94,8 +97,10 @@ static void test_full_up_and_down_ranges(void)
 {
     uint8_t expected;
     reset_firmware();
+
     press_debounced(GPIO_Pin_4);
-    for (expected = 2U; expected <= 9U; ++expected)
+    assert(App_GetDigit() == 2U); /* immediate 1 -> 2 */
+    for (expected = 3U; expected <= 9U; ++expected)
     {
         ticks(APP_STEP_TIME_MS);
         assert(App_GetDigit() == expected);
@@ -105,8 +110,15 @@ static void test_full_up_and_down_ranges(void)
     assert(App_GetDigit() == 9U); /* saturated, never wraps to 0/1 */
     release_debounced(GPIO_Pin_4);
 
+    /* A new UP command at the upper boundary stays at 9. */
+    press_debounced(GPIO_Pin_4);
+    assert(App_GetDigit() == 9U);
+    assert(App_GetMode() == APP_PAUSED);
+    release_debounced(GPIO_Pin_4);
+
     press_debounced(GPIO_Pin_5);
-    for (expected = 8U; expected >= 1U; --expected)
+    assert(App_GetDigit() == 8U); /* immediate 9 -> 8 */
+    for (expected = 7U; expected >= 1U; --expected)
     {
         ticks(APP_STEP_TIME_MS);
         assert(App_GetDigit() == expected);
@@ -115,6 +127,34 @@ static void test_full_up_and_down_ranges(void)
     ticks(2000U);
     assert(App_GetDigit() == 1U); /* saturated, never wraps to 9 */
     release_debounced(GPIO_Pin_5);
+
+    /* A new DOWN command at the lower boundary stays at 1. */
+    press_debounced(GPIO_Pin_5);
+    assert(App_GetDigit() == 1U);
+    assert(App_GetMode() == APP_PAUSED);
+    release_debounced(GPIO_Pin_5);
+}
+
+static void test_momentary_release_does_not_cancel_counting(void)
+{
+    reset_firmware();
+    press_debounced(GPIO_Pin_4);
+    assert(App_GetDigit() == 2U);
+
+    /* The key is a momentary contact: releasing it must not cancel the mode
+       or require the user to hold it for the automatic counting interval. */
+    release_debounced(GPIO_Pin_4);
+    assert(App_GetDigit() == 2U);
+    assert(App_GetMode() == APP_COUNTING_UP);
+    assert(App_GetElapsedMs() == BUTTON_DEBOUNCE_MS);
+
+    ticks(APP_STEP_TIME_MS - BUTTON_DEBOUNCE_MS);
+    assert(App_GetDigit() == 3U);
+    set_pin(GPIO_Pin_6, 1);
+    ticks(1U);
+    assert(App_GetMode() == APP_PAUSED);
+    assert(App_GetDigit() == 3U);
+    set_pin(GPIO_Pin_6, 0);
 }
 
 static void test_pause_resume_and_pa7_is_unused(void)
@@ -127,28 +167,32 @@ static void test_pause_resume_and_pa7_is_unused(void)
     set_pin(GPIO_Pin_7, 0);
 
     press_debounced(GPIO_Pin_4);
+    assert(App_GetDigit() == 2U);
     ticks(250U);
     set_pin(GPIO_Pin_6, 1);
     ticks(1U);
-    assert(App_GetDigit() == 1U);
+    assert(App_GetDigit() == 2U);
     assert(App_GetMode() == APP_PAUSED);
     set_pin(GPIO_Pin_6, 0);
     release_debounced(GPIO_Pin_4);
     ticks(1000U);
-    assert(App_GetDigit() == 1U); /* releasing STOP never auto-resumes */
+    assert(App_GetDigit() == 2U); /* releasing STOP never auto-resumes */
 
     press_debounced(GPIO_Pin_4);
+    assert(App_GetDigit() == 3U); /* resume also gives immediate feedback */
+    assert(App_GetElapsedMs() == 0U);
     ticks(APP_STEP_TIME_MS);
-    assert(App_GetDigit() == 2U); /* resume gets a complete fresh interval */
+    assert(App_GetDigit() == 4U);
     release_debounced(GPIO_Pin_4);
 }
 
 int main(void)
 {
     test_scan_and_idle_polarity();
-    test_debounce_up_and_stop_before_step();
+    test_immediate_up_and_stop_before_next_step();
     test_full_up_and_down_ranges();
+    test_momentary_release_does_not_cancel_counting();
     test_pause_resume_and_pa7_is_unused();
-    puts("firmware logic: PASS (scan, polarity, debounce, stop, 1..9 saturation, PA7 unused)");
+    puts("firmware logic: PASS (scan, polarity, immediate momentary steps, release, stop, 1..9 saturation, PA7 unused)");
     return 0;
 }

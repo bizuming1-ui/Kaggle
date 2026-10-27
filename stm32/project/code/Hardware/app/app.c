@@ -13,12 +13,27 @@ static void App_StopNow(void)
 static void App_StartUp(void)
 {
     s_elapsedMs = 0U;
+
+    /* A momentary key gives visible feedback as soon as its rising edge is
+       debounced.  Do not make the user wait for the first 500 ms interval. */
+    if (s_digit < APP_MAX_DIGIT)
+    {
+        ++s_digit;
+        Matrix_SetDigit(s_digit);
+    }
     s_mode = (s_digit < APP_MAX_DIGIT) ? APP_COUNTING_UP : APP_PAUSED;
 }
 
 static void App_StartDown(void)
 {
     s_elapsedMs = 0U;
+
+    /* Same immediate first step for a momentary DOWN key. */
+    if (s_digit > APP_MIN_DIGIT)
+    {
+        --s_digit;
+        Matrix_SetDigit(s_digit);
+    }
     s_mode = (s_digit > APP_MIN_DIGIT) ? APP_COUNTING_DOWN : APP_PAUSED;
 }
 
@@ -94,7 +109,8 @@ void App_Task1ms(void)
     }
 
     /* Deterministic priority if both direction events arrive together:
-       PA4 (UP) first, then PA5 (DOWN). A new command gets a full step period. */
+       PA4 (UP) first, then PA5 (DOWN). After the immediate first step, the
+       next automatic step gets a complete APP_STEP_TIME_MS interval. */
     if ((events & BUTTON_EVENT_UP) != 0U)
     {
         App_StartUp();

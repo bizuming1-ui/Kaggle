@@ -53,6 +53,9 @@ void Buttons_Init(void)
 
 uint8_t Buttons_Scan1ms(void)
 {
+    /* Momentary keys: emit exactly one event on a debounced LOW -> HIGH
+       transition. Releasing or holding the key does not create another
+       start event; automatic counting is handled by App_Task1ms(). */
     uint8_t events = 0U;
     uint8_t index;
 

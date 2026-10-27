@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 
-/* User-adjustable behavior. No video was available to calibrate this interval. */
+/* Interval between automatic steps after the immediate debounced key step.
+   The supplied video shows the fault, not a working timing reference. */
 #define APP_STEP_TIME_MS       500U
 #define APP_INITIAL_DIGIT      1U
 #define APP_MIN_DIGIT          1U
