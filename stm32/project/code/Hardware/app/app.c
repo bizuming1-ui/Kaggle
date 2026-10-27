@@ -14,8 +14,9 @@ static void App_StartUp(void)
 {
     s_elapsedMs = 0U;
 
-    /* A momentary key gives visible feedback as soon as its active edge is
-       debounced. Do not make the user wait for the first 500 ms interval. */
+    /* The first active-LOW sample gives immediate visible feedback. Press
+       bounce is suppressed by Buttons_Scan1ms's latch, not by delaying the
+       first step. Do not make the user wait for the first 500 ms interval. */
     if (s_digit < APP_MAX_DIGIT)
     {
         ++s_digit;

@@ -4,7 +4,7 @@
 
 ## Proteus 8 × 8×8 点阵固件
 
-`stm32/project/code/` 现已包含一套可在工作台直接复制的 STM32F103C8T6 固件，目录与当前 Keil 工程对应：`User/main.c`、`User/stm32f10x_it.c/.h`、`Hardware/app/app.c/.h`、`Hardware/matrix/matrix.c/.h`、`Hardware/buttons/buttons.c/.h`。最新版本按照片的实际接线，将 PA4/PA5/PA6 配置为**内部上拉、接 GND 时按下**。轻触 PA4/PA5 经 20 ms 消抖后立即递增/递减一步，随后按 500 ms 间隔继续到 9/1；PA6 拉低立即停止。点阵采用 Proteus 默认列阳极/行阴极的 8 列动态扫描。工程提供唯一的 `SysTick_Handler` 和 `system_tick` 定义，主循环按累计毫秒 tick 持续扫描，不再依赖 `COUNTFLAG` 或未知的旧中断实现。照片中的 `MATRIX-8X8-BLUE` 应先换成 `MATRIX-8X8-RED` 做 3.3 V 直驱验证。
+`stm32/project/code/` 现已包含一套可在工作台直接复制的 STM32F103C8T6 固件，目录与当前 Keil 工程对应：`User/main.c`、`User/stm32f10x_it.c/.h`、`Hardware/app/app.c/.h`、`Hardware/matrix/matrix.c/.h`、`Hardware/buttons/buttons.c/.h`。最新版本按照片的实际接线，将 PA4/PA5/PA6 配置为**内部上拉、接 GND 时按下**。轻触 PA4/PA5 时，第一个低电平采样就立即递增/递减一步并锁存，不要求按住 20 ms；20 ms 只用于松开消抖和允许下一次按键。随后按 500 ms 间隔继续到 9/1；PA6 拉低立即停止。点阵采用 Proteus 默认列阳极/行阴极的 8 列动态扫描。工程提供唯一的 `SysTick_Handler` 和 `system_tick` 定义，主循环按累计毫秒 tick 持续扫描，不再依赖 `COUNTFLAG` 或未知的旧中断实现。最新照片中的 `MATRIX-8X8-RED` 已能显示 1，保持该红色点阵即可；本次只修复短按首次响应与重新武装逻辑。
 
 工作台另外提供 **`/firmware.hex`** 下载：这是当前五个 `.c` 的独立 8 MHz Proteus A/B 版本，用于排除旧 `Project.axf` 和 Keil 工程集成干扰。它已在 Unicorn 中实际执行 Thumb/Cortex-M3 指令，确认连续八列扫描和 PA4/PA5/PA6 行为；这不等于已经在用户的 Proteus 原理图上通过。
 

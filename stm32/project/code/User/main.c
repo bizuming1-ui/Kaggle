@@ -14,6 +14,7 @@
  *   PA5 <- DOWN button,   other button terminal -> GND (as in the photo)
  *   PA6 <- STOP button,   other button terminal -> GND (as in the photo)
  *   Released inputs use internal pull-ups; pressed inputs are active LOW.
+ *   First LOW sample steps immediately; 20 ms HIGH releases/re-arms the key.
  *   PA7 is deliberately unused because no fourth-button function was specified.
  *
  * IMPORTANT:

@@ -11,8 +11,8 @@
 typedef struct
 {
     uint16_t pin;
-    uint8_t stablePressed;
-    uint8_t debounceMs;
+    uint8_t pressedLatch;
+    uint8_t releaseMs;
 } DebouncedButton;
 
 /* Match the supplied Proteus schematic: PA4/PA5/PA6 connect to GND when
@@ -46,17 +46,18 @@ void Buttons_Init(void)
        safe idle input but deliberately do not generate an event for it. */
     Buttons_ConfigPullUp(7U);
 
-    s_directionButtons[0].stablePressed = 0U;
-    s_directionButtons[0].debounceMs = 0U;
-    s_directionButtons[1].stablePressed = 0U;
-    s_directionButtons[1].debounceMs = 0U;
+    s_directionButtons[0].pressedLatch = 0U;
+    s_directionButtons[0].releaseMs = 0U;
+    s_directionButtons[1].pressedLatch = 0U;
+    s_directionButtons[1].releaseMs = 0U;
 }
 
 uint8_t Buttons_Scan1ms(void)
 {
-    /* Momentary active-LOW keys: emit exactly one event on a debounced
-       released(HIGH) -> pressed(LOW) transition. Holding or releasing does
-       not create another start event; App_Task1ms() handles auto counting. */
+    /* A momentary key must not be held for 20 ms before anything happens.
+       The first active-LOW sample emits one event and latches the key.
+       Further press bounce cannot emit another event. Twenty milliseconds
+       of continuous HIGH is required only to release/re-arm the key. */
     uint8_t events = 0U;
     uint8_t index;
 
@@ -64,26 +65,30 @@ uint8_t Buttons_Scan1ms(void)
     {
         uint8_t rawPressed = (GPIOA->IDR & s_directionButtons[index].pin) ? 0U : 1U;
 
-        if (rawPressed == s_directionButtons[index].stablePressed)
+        if (rawPressed != 0U)
         {
-            s_directionButtons[index].debounceMs = 0U;
+            s_directionButtons[index].releaseMs = 0U;
+            if (s_directionButtons[index].pressedLatch == 0U)
+            {
+                s_directionButtons[index].pressedLatch = 1U;
+                events |= (uint8_t)(1U << index);
+            }
+        }
+        else if (s_directionButtons[index].pressedLatch != 0U)
+        {
+            if (s_directionButtons[index].releaseMs < BUTTON_DEBOUNCE_MS)
+            {
+                ++s_directionButtons[index].releaseMs;
+            }
+            if (s_directionButtons[index].releaseMs >= BUTTON_DEBOUNCE_MS)
+            {
+                s_directionButtons[index].pressedLatch = 0U;
+                s_directionButtons[index].releaseMs = 0U;
+            }
         }
         else
         {
-            if (s_directionButtons[index].debounceMs < BUTTON_DEBOUNCE_MS)
-            {
-                ++s_directionButtons[index].debounceMs;
-            }
-
-            if (s_directionButtons[index].debounceMs >= BUTTON_DEBOUNCE_MS)
-            {
-                s_directionButtons[index].stablePressed = rawPressed;
-                s_directionButtons[index].debounceMs = 0U;
-                if (rawPressed != 0U)
-                {
-                    events |= (uint8_t)(1U << index);
-                }
-            }
+            s_directionButtons[index].releaseMs = 0U;
         }
     }
 

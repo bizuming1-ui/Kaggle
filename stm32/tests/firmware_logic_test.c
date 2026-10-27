@@ -36,10 +36,10 @@ static void set_pin(uint16_t pin, int high)
     else mock_gpioa.IDR &= (uint32_t)~pin;
 }
 
-static void press_debounced(uint16_t pin)
+static void press_immediate(uint16_t pin)
 {
     set_pin(pin, 0);              /* active LOW: contact connects to GND */
-    ticks(BUTTON_DEBOUNCE_MS);
+    ticks(1U);                    /* first LOW sample must already step */
 }
 
 static void release_debounced(uint16_t pin)
@@ -75,12 +75,10 @@ static void test_scan_and_idle_polarity(void)
 static void test_immediate_up_and_stop_before_next_step(void)
 {
     reset_firmware();
-    set_pin(GPIO_Pin_4, 0);       /* press PA4 to GND */
-    ticks(BUTTON_DEBOUNCE_MS - 1U);
     assert(App_GetMode() == APP_PAUSED);
     assert(App_GetDigit() == 1U);
-
-    ticks(1U);                    /* debounced momentary HIGH -> LOW edge */
+    set_pin(GPIO_Pin_4, 0);       /* press PA4 to GND */
+    ticks(1U);                    /* immediate momentary HIGH -> LOW sample */
     assert(App_GetMode() == APP_COUNTING_UP);
     assert(App_GetDigit() == 2U); /* immediate first step, not +500 ms */
     assert(App_GetElapsedMs() == 0U);
@@ -100,12 +98,41 @@ static void test_immediate_up_and_stop_before_next_step(void)
     assert(App_GetMode() == APP_PAUSED);
 }
 
+static void test_short_tap_bounce_and_rearm(void)
+{
+    reset_firmware();
+    press_immediate(GPIO_Pin_4);
+    assert(App_GetDigit() == 2U); /* a 1 ms active sample is enough */
+
+    /* A short HIGH bounce does not re-arm the latched key. */
+    set_pin(GPIO_Pin_4, 1);
+    ticks(5U);
+    set_pin(GPIO_Pin_4, 0);
+    ticks(1U);
+    assert(App_GetDigit() == 2U);
+
+    /* Likewise, 19 ms HIGH is insufficient; another LOW is still the same
+       physical press and must not produce a second immediate increment. */
+    set_pin(GPIO_Pin_4, 1);
+    ticks(BUTTON_DEBOUNCE_MS - 1U);
+    set_pin(GPIO_Pin_4, 0);
+    ticks(1U);
+    assert(App_GetDigit() == 2U);
+
+    /* A continuous 20 ms HIGH release rearms exactly one next press. */
+    set_pin(GPIO_Pin_4, 1);
+    ticks(BUTTON_DEBOUNCE_MS);
+    press_immediate(GPIO_Pin_4);
+    assert(App_GetDigit() == 3U);
+    release_debounced(GPIO_Pin_4);
+}
+
 static void test_full_up_and_down_ranges(void)
 {
     uint8_t expected;
     reset_firmware();
 
-    press_debounced(GPIO_Pin_4);
+    press_immediate(GPIO_Pin_4);
     assert(App_GetDigit() == 2U); /* immediate 1 -> 2 */
     for (expected = 3U; expected <= 9U; ++expected)
     {
@@ -118,12 +145,12 @@ static void test_full_up_and_down_ranges(void)
     release_debounced(GPIO_Pin_4);
 
     /* A new UP command at the upper boundary stays at 9. */
-    press_debounced(GPIO_Pin_4);
+    press_immediate(GPIO_Pin_4);
     assert(App_GetDigit() == 9U);
     assert(App_GetMode() == APP_PAUSED);
     release_debounced(GPIO_Pin_4);
 
-    press_debounced(GPIO_Pin_5);
+    press_immediate(GPIO_Pin_5);
     assert(App_GetDigit() == 8U); /* immediate 9 -> 8 */
     for (expected = 7U; expected >= 1U; --expected)
     {
@@ -136,7 +163,7 @@ static void test_full_up_and_down_ranges(void)
     release_debounced(GPIO_Pin_5);
 
     /* A new DOWN command at the lower boundary stays at 1. */
-    press_debounced(GPIO_Pin_5);
+    press_immediate(GPIO_Pin_5);
     assert(App_GetDigit() == 1U);
     assert(App_GetMode() == APP_PAUSED);
     release_debounced(GPIO_Pin_5);
@@ -145,7 +172,7 @@ static void test_full_up_and_down_ranges(void)
 static void test_momentary_release_does_not_cancel_counting(void)
 {
     reset_firmware();
-    press_debounced(GPIO_Pin_4);
+    press_immediate(GPIO_Pin_4);
     assert(App_GetDigit() == 2U);
 
     /* The key is a momentary contact: releasing it must not cancel the mode
@@ -173,7 +200,7 @@ static void test_pause_resume_and_pa7_is_unused(void)
     assert(App_GetMode() == APP_PAUSED);
     set_pin(GPIO_Pin_7, 1);
 
-    press_debounced(GPIO_Pin_4);
+    press_immediate(GPIO_Pin_4);
     assert(App_GetDigit() == 2U);
     ticks(250U);
     set_pin(GPIO_Pin_6, 0);
@@ -185,7 +212,7 @@ static void test_pause_resume_and_pa7_is_unused(void)
     ticks(1000U);
     assert(App_GetDigit() == 2U); /* releasing STOP never auto-resumes */
 
-    press_debounced(GPIO_Pin_4);
+    press_immediate(GPIO_Pin_4);
     assert(App_GetDigit() == 3U); /* resume also gives immediate feedback */
     assert(App_GetElapsedMs() == 0U);
     ticks(APP_STEP_TIME_MS);
@@ -197,9 +224,10 @@ int main(void)
 {
     test_scan_and_idle_polarity();
     test_immediate_up_and_stop_before_next_step();
+    test_short_tap_bounce_and_rearm();
     test_full_up_and_down_ranges();
     test_momentary_release_does_not_cancel_counting();
     test_pause_resume_and_pa7_is_unused();
-    puts("firmware logic: PASS (scan, GND active-LOW pull-ups, immediate steps, release, stop, 1..9 saturation, PA7 unused)");
+    puts("firmware logic: PASS (scan, 1 ms active-LOW steps, press latch, 20 ms release re-arm, stop, 1..9 saturation, PA7 unused)");
     return 0;
 }

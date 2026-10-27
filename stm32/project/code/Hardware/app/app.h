@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* Interval between automatic steps after the immediate debounced key step.
+/* Interval between automatic steps after the immediate active-LOW key step.
    The supplied video shows the fault, not a working timing reference. */
 #define APP_STEP_TIME_MS       500U
 #define APP_INITIAL_DIGIT      1U
