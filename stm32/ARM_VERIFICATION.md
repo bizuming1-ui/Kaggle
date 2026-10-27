@@ -6,15 +6,14 @@
 
 本次不是只做主机 C 单元测试，也不是只检查 `.o` 能否生成。沙盒使用 Clang/Lld 以 `thumb-freestanding-eabi`、Cortex-M3 为目标，直接编译并链接以下当前项目源文件：
 
-- `project/code/User/main.c`
+- `project/code/User/main.c`（包含全部点阵、按键和计数实现）
 - `project/code/User/stm32f10x_it.c`
-- `project/code/Hardware/app/app.c`
-- `project/code/Hardware/buttons/buttons.c`
-- `project/code/Hardware/matrix/matrix.c`
+
+编译时没有链接任何旧 `app.c/buttons.c/matrix.c`。主机符号检查同时确认主程序没有未解析的 `App_/Buttons_/Matrix_` 引用。
 
 生成的 Thumb ELF 由 Unicorn 2.1.4 按 ARM 指令执行。仿真从复位入口开始，初始化真实 STM32 地址上的 GPIO、AFIO、RCC 和 SysTick 寄存器，再按照最新照片注入 PA4/PA5/PA6 的 GND 按键电平，读取 GPIOA/GPIOB 寄存器和应用内部状态。
 
-最新照片显示按键公共端接 GND，因此当前 `buttons.c/.h` 使用内部上拉、低电平按下。为消除短按无反馈，第一个低电平采样立即产生一次事件并锁存；20 ms 仅用于连续松开后的重新武装。独立 HEX 使用 8 MHz HSI 假设和最小 Cortex-M3 启动/链接支持，不依赖用户旧工程中的 `Project.axf`、启动文件或时钟文件。
+最新照片显示按键公共端接 GND，因此当前自包含 `main.c` 使用内部上拉、低电平按下。第一个低电平采样立即产生一次事件并锁存；20 ms 仅用于连续松开后的重新武装。独立 HEX 使用 8 MHz HSI 和最小 Cortex-M3 启动/链接支持，不依赖用户旧工程中的 `Project.axf`、启动文件、时钟文件或任何旧 Hardware 对象。
 
 ### 明确的验证边界
 
@@ -76,8 +75,8 @@
 - Intel HEX，Flash 起始地址 `0x08000000`。
 - 初始 MSP：`0x20005000`；Reset 与 SysTick 向量均指向生成的 Thumb 代码。
 - 8 MHz 独立版，SysTick 重装值 7999。
-- 实际 Flash 数据 1480 字节。
-- SHA-256：`76ca7f94ab5e85f2a44bab2ae52bab884dd3b5bf4766d5164bd9347e8a0501d7`。
+- 实际 Flash 数据 1376 字节。
+- SHA-256：`85c529328cd0e8e6cebd2354cce44e3c822361130e6c3b28e220a9a3c1a0b631`。
 
 生成后又按 Intel HEX 记录逐字节回读，与 ELF 的所有 LOAD 段比较一致。该文件用于排除 Keil 工程集成和旧 AXF 干扰；它不是对用户 Proteus 原理图已经通过的承诺。
 
@@ -86,6 +85,6 @@
 1. **红色点阵已经显示 1。** 这说明显示电气和扫描已经工作，不需要继续修改字模或 GPIO 显示极性。
 2. **按键释放电平正确。** PA4/PA5/PA6 在 MCU 端均呈高电平，与内部上拉相符；用户也明确确认按下时另一端接 GND。
 3. **首次反馈不应依赖长按。** 旧实现要求连续按下 20 tick 才产生事件。新实现首个低电平 tick 立即步进并锁存，20 ms 仅用于松开重新武装，更适合 Proteus 中的短鼠标点击。
-4. **仍必须排除旧构建。** 最新照片继续显示 `Objects\Project.axf`。当前 `App_Task1ms()` 每次扫描后都会无条件执行按键扫描，所以替换源码后仍需 Clean/Rebuild，并确认 Proteus 加载的是新 AXF/HEX，而不是仅根据路径推断版本。
+4. **从结构上排除旧模块。** 最新照片继续显示 `Objects\Project.axf`。新主程序已不引用旧 Hardware 函数，浏览器也移除了旧模块；复制 4 文件并从 Target 移除旧 Hardware 源文件后，旧 `app.o/buttons.o/matrix.o` 不再可能提供运行业务逻辑。
 
-尚未在用户的 `.pdsprj` 上直接执行 Proteus，因此不把工程版本或点击时长写成唯一已证实根因；上述代码变更和测试消除了首次按键必须保持 20 tick 的明确限制。
+尚未在用户的 `.pdsprj` 上直接执行 Proteus，因此不把工程版本或点击时长写成唯一已证实根因；本次通过自包含源码、符号检查和精确双源文件 ARM 构建消除了旧模块参与运行的路径。

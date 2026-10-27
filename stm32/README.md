@@ -4,9 +4,11 @@
 
 ## Proteus 8 × 8×8 点阵固件
 
-`stm32/project/code/` 现已包含一套可在工作台直接复制的 STM32F103C8T6 固件，目录与当前 Keil 工程对应：`User/main.c`、`User/stm32f10x_it.c/.h`、`Hardware/app/app.c/.h`、`Hardware/matrix/matrix.c/.h`、`Hardware/buttons/buttons.c/.h`。最新版本按照片的实际接线，将 PA4/PA5/PA6 配置为**内部上拉、接 GND 时按下**。轻触 PA4/PA5 时，第一个低电平采样就立即递增/递减一步并锁存，不要求按住 20 ms；20 ms 只用于松开消抖和允许下一次按键。随后按 500 ms 间隔继续到 9/1；PA6 拉低立即停止。点阵采用 Proteus 默认列阳极/行阴极的 8 列动态扫描。工程提供唯一的 `SysTick_Handler` 和 `system_tick` 定义，主循环按累计毫秒 tick 持续扫描，不再依赖 `COUNTFLAG` 或未知的旧中断实现。最新照片中的 `MATRIX-8X8-RED` 已能显示 1，保持该红色点阵即可；本次只修复短按首次响应与重新武装逻辑。
+`stm32/project/code/` 现在只保留 4 个交付文件：`User/main.c`、`User/matrix_firmware.h`、`User/stm32f10x_it.c/.h`。为避免 Keil 继续链接旧 Hardware 对象，点阵、按键和计数已全部收进自包含 `main.c`；它不再包含 `app.h`，也不调用旧 `App_*`、`Buttons_*` 或 `Matrix_*` 外部函数。
 
-工作台另外提供 **`/firmware.hex`** 下载：这是当前五个 `.c` 的独立 8 MHz Proteus A/B 版本，用于排除旧 `Project.axf` 和 Keil 工程集成干扰。它已在 Unicorn 中实际执行 Thumb/Cortex-M3 指令，确认连续八列扫描和 PA4/PA5/PA6 行为；这不等于已经在用户的 Proteus 原理图上通过。
+PA4/PA5/PA6 按照片配置为**内部上拉、接 GND 时按下**。第一个低电平采样立即递增/递减并锁存，20 ms 只用于松开重新武装；随后每 500 ms 自动步进到 9/1，PA6 拉低立即暂停，PA7 无功能。点阵保持已能显示 1 的 `MATRIX-8X8-RED` 和 8 列动态扫描。工程只有唯一的 `SysTick_Handler` 和 `system_tick` 定义。
+
+工作台另外提供 **`/firmware.hex`** 下载：它只由当前 `main.c + stm32f10x_it.c` 两个应用 `.c` 构建，用于排除旧 `Project.axf` 和 Keil 工程集成干扰。已在 Unicorn 中实际执行 Thumb/Cortex-M3 指令，确认连续八列扫描和 PA4/PA5/PA6 行为；这不等于已经在用户的 Proteus 原理图上通过。
 
 精确接线、独立 HEX 使用方法、失效 `Scene.c` 引用处理与 Keil 工程集成见 [`PROTEUS_8X8_GUIDE.md`](./PROTEUS_8X8_GUIDE.md)；实测寄存器序列、像素重建、HEX 校验值与仿真边界见 [`ARM_VERIFICATION.md`](./ARM_VERIFICATION.md)。
 
@@ -123,6 +125,6 @@ npm run stm32:test
 
 ## 当前边界：离线 ARM 验证不等于 Proteus 电气验证
 
-当前五个业务 `.c` 已在补充启动/链接支持后生成真实 Thumb ELF，并由 Unicorn 执行；独立 HEX 的扫描、按键和像素数据已有实测记录。测试框架按 1 ms 调用真实 SysTick Handler，并检查重装值，但未把 Unicorn 当作完整的周期精确 NVIC 或 Proteus 电气模型。
+当前自包含 `main.c` 与 `stm32f10x_it.c` 已在补充启动/链接支持后生成真实 Thumb ELF，并由 Unicorn 执行；独立 HEX 的扫描、按键和像素数据已有实测记录。测试框架按 1 ms 调用真实 SysTick Handler，并检查重装值，但未把 Unicorn 当作完整的周期精确 NVIC 或 Proteus 电气模型。
 
 浏览器页本身仍没有实时 ARM 内核，不会用随机动画或假日志冒充运行结果。用户具体 Keil 工程的启动/时钟文件、Proteus Program File、LED 压降与原理图仍需在 Proteus 中做最终 A/B 验证。

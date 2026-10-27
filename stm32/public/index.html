@@ -232,7 +232,7 @@
             <div><p class="eyebrow"><span></span> HARDWARE SIMULATION</p><h1>硬件仿真</h1><p>最新独立 8 MHz HEX 已按照片的 GND 按键完成真实 Thumb 指令验证；短按首个低电平立即步进，20 ms 用于松开重新武装。</p></div>
             <a class="button button--light" href="/firmware.hex" download="stm32f103-matrix-8mhz.hex"><svg><use href="#i-download"/></svg>下载已验证 HEX</a>
           </div>
-          <div class="honesty-notice"><svg><use href="#i-info"/></svg><div><strong>离线 ARM 验证通过，不等于 Proteus 已通过</strong><p>已实际执行当前五个业务 .c 生成的 Cortex-M3 代码，并核对 GPIOB 扫描、PA4/PA5/PA6 和 SysTick 参数。此页不显示虚构的实时运行结果；LED 压降、电流、Program File 与你的原理图仍需在 Proteus 中验证。</p></div></div>
+          <div class="honesty-notice"><svg><use href="#i-info"/></svg><div><strong>离线 ARM 验证通过，不等于 Proteus 已通过</strong><p>已只编译自包含 main.c 与 stm32f10x_it.c 并实际执行 Cortex-M3 代码，核对 GPIOB 扫描、PA4/PA5/PA6 和 SysTick 参数；不再依赖旧 Hardware 模块。此页不显示虚构的实时运行结果；LED 压降、电流、Program File 与你的原理图仍需在 Proteus 中验证。</p></div></div>
           <div class="simulation-grid">
             <section class="panel simulation-board-panel"><div class="panel-heading"><div class="panel-title"><div><h2>Blue Pill 目标视图</h2><p>STM32F103C8T6 最小系统板</p></div></div><span class="mono-label">REV · F103C8</span></div><div class="board-stage board-stage--large" data-board="large"></div><div class="pin-legend"><span><i class="pin-dot pin-dot--green"></i>GPIO</span><span><i class="pin-dot pin-dot--orange"></i>POWER</span><span><i class="pin-dot pin-dot--blue"></i>DEBUG</span><span class="pin-legend-note">仅外观示意 · 非实时电平</span></div></section>
             <aside class="simulation-side">

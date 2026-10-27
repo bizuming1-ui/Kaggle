@@ -9,24 +9,20 @@ CC="${CC:-gcc}"
 CFLAGS=(-std=c99 -Wall -Wextra -Werror -pedantic -Wshadow -Wundef)
 INCLUDES=(
   -I"$ROOT/stm32/tests/firmware_stub"
-  -I"$ROOT/stm32/project/code/Hardware/app"
-  -I"$ROOT/stm32/project/code/Hardware/buttons"
-  -I"$ROOT/stm32/project/code/Hardware/matrix"
   -I"$ROOT/stm32/project/code/User"
 )
-SOURCES=(
-  "$ROOT/stm32/project/code/Hardware/app/app.c"
-  "$ROOT/stm32/project/code/Hardware/buttons/buttons.c"
-  "$ROOT/stm32/project/code/Hardware/matrix/matrix.c"
-)
 
+# Test the exact self-contained main.c, with only its entry point renamed so
+# the host test can supply its own main(). No legacy Hardware module is linked.
+"$CC" "${CFLAGS[@]}" "${INCLUDES[@]}" -Dmain=Firmware_MainForTest \
+  -c "$ROOT/stm32/project/code/User/main.c" -o "$BUILD/main_testable.o"
 "$CC" "${CFLAGS[@]}" "${INCLUDES[@]}" \
-  "${SOURCES[@]}" "$ROOT/stm32/tests/firmware_logic_test.c" \
-  -o "$BUILD/firmware_logic_test"
+  "$BUILD/main_testable.o" \
+  "$ROOT/stm32/project/code/User/stm32f10x_it.c" \
+  "$ROOT/stm32/tests/firmware_logic_test.c" -o "$BUILD/firmware_logic_test"
 "$BUILD/firmware_logic_test"
 
-# Compile main.c and the supplied interrupt source without linking a second
-# host main() into the application-state test.
+# Also compile the production entry point and supplied interrupt source.
 "$CC" "${CFLAGS[@]}" "${INCLUDES[@]}" \
   -c "$ROOT/stm32/project/code/User/main.c" -o "$BUILD/main.o"
 "$CC" "${CFLAGS[@]}" "${INCLUDES[@]}" \
@@ -34,7 +30,11 @@ SOURCES=(
 if command -v nm >/dev/null 2>&1; then
   nm "$BUILD/main.o" | grep -Eq '[[:space:]]U[[:space:]]system_tick$'
   nm "$BUILD/stm32f10x_it.o" | grep -Eq '[[:space:]][BCD][[:space:]]system_tick$'
-  echo "single system_tick definition and main reference: PASS"
+  if nm "$BUILD/main.o" | grep -Eq '[[:space:]]U[[:space:]](App_|Buttons_|Matrix_)'; then
+    echo "self-contained main unexpectedly references a legacy Hardware object" >&2
+    exit 1
+  fi
+  echo "single system_tick definition and self-contained main: PASS"
 fi
 "$CC" "${CFLAGS[@]}" "${INCLUDES[@]}" \
   "$ROOT/stm32/project/code/User/stm32f10x_it.c" \
